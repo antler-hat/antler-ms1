@@ -274,7 +274,7 @@
         <div class="control-group-horizontal">
              <div class="control-group">
                 <label for="vco1-lfo-level">LFO Level</label>
-                <div class="knob" id="vco1-lfo-level" data-param="vco1LfoGain.gain.value" data-min="0" data-max="1  000" data-value="0" tabindex="0"></div> <!-- LFO pitch mod depth in cents -->
+                <div class="knob" id="vco1-lfo-level" data-param="vco1LfoGain.gain.value" data-min="0" data-max="500" data-value="0" tabindex="0"></div> <!-- LFO pitch mod depth in cents -->
             </div>
             <div class="control-group">
                 <label for="vco1-xmod">X-MOD</label>
@@ -301,7 +301,7 @@
          <div class="control-group-horizontal">
              <div class="control-group">
                 <label for="vco2-lfo-level">LFO Level</label>
-                <div class="knob" id="vco2-lfo-level" data-param="vco2LfoGain.gain.value" data-min="0" data-max="1  000" data-value="0" tabindex="0"></div> <!-- LFO pitch mod depth in cents -->
+                <div class="knob" id="vco2-lfo-level" data-param="vco2LfoGain.gain.value" data-min="0" data-max="500" data-value="0" tabindex="0"></div> <!-- LFO pitch mod depth in cents -->
             </div>
             <div class="control-group">
                 <label for="vco2-detune">Detune</label>
@@ -479,17 +479,21 @@
     }
 
     function calculateVcoFrequency(baseFreq, vcoParams) {
-        let octaveIndex = vcoParams.octave;
+        let octaveIndex = vcoParams.octave; // Get the index (should be 0-4)
+
+        // Ensure octaveIndex is a valid number within range, default gracefully if not.
+        // This check is less strict than before, trusting updateParameter more.
         if (typeof octaveIndex !== 'number' || isNaN(octaveIndex) || octaveIndex < 0 || octaveIndex >= octaveMultipliers.length) {
-            console.warn(`Invalid VCO Octave Index (${octaveIndex}), defaulting to 2 (8')`);
-            octaveIndex = 2;
-            vcoParams.octave = octaveIndex;
+            console.warn(`calculateVcoFrequency received invalid octaveIndex (${octaveIndex}), defaulting to index 2 (8')`);
+            octaveIndex = 2; // Default to 8' index
+            // DO NOT modify vcoParams.octave here - let updateParameter handle the source data
         }
-        const freq = baseFreq * octaveMultipliers[octaveIndex];
+
+        const freq = baseFreq * octaveMultipliers[octaveIndex]; // Use the validated/defaulted index
         const safeFreq = Math.max(20, Math.min((audioContext?.sampleRate || 44100) / 2, freq));
         if (!isFinite(safeFreq)) {
             console.error("FATAL: Calculated VCO frequency is non-finite!", freq, baseFreq, octaveIndex);
-            return 440;
+            return 440; // Return a safe default
         }
         return safeFreq;
     }
@@ -904,8 +908,8 @@
 
         if (!paramPath || paramPath === 'dummy.xmod') return;
 
-        let targetValue = newValue;
-        let actualAudioValue;
+        let targetValue = newValue; // For knobs, this might be the raw value or step index
+        let actualAudioValue;       // The value used by the AudioNode (freq, gain, type string etc)
 
         if (isKnob) {
             const min = parseFloat(element.dataset.min);
@@ -915,13 +919,18 @@
 
             if (steps) {
                 const stepIndex = Math.max(0, Math.min(steps.length - 1, Math.round(numericNewValue)));
-                targetValue = stepIndex;
+                targetValue = stepIndex; // For stepped knobs, targetValue IS the index
                 const stepValueStr = steps[stepIndex];
+                // Determine the value needed by the Audio API (e.g., 'sawtooth', not index)
                 actualAudioValue = isNaN(parseFloat(stepValueStr)) ? stepValueStr : parseFloat(stepValueStr);
+                 // For octave, we don't set an audio param directly, the index is used later
+                 if (paramPath.endsWith('.octave')) {
+                     actualAudioValue = targetValue; // Keep actualAudioValue as index for internal storage logic
+                 }
             } else {
                 targetValue = numericNewValue;
                 targetValue = Math.max(min, Math.min(max, targetValue));
-                actualAudioValue = targetValue;
+                actualAudioValue = targetValue; // For linear knobs, targetValue is the audio value
             }
             updateKnobVisual(element, targetValue);
 
@@ -949,11 +958,20 @@
                 currentParamObj = currentParamObj[parts[i]];
             }
             const finalKey = parts[parts.length - 1];
-            if (typeof currentParamObj[finalKey] === 'object' && currentParamObj[finalKey] !== null && 'value' in currentParamObj[finalKey] && typeof actualAudioValue === 'number') {
+
+            /* START FIX 2: Explicitly store index for octave */
+            // For the 'octave' parameter, we MUST store the step index (targetValue)
+            if (finalKey === 'octave' && isKnob) {
+                currentParamObj[finalKey] = targetValue; // Ensure index (0-4) is stored
+            }
+            // Original logic for other parameters
+            else if (typeof currentParamObj[finalKey] === 'object' && currentParamObj[finalKey] !== null && 'value' in currentParamObj[finalKey] && typeof actualAudioValue === 'number') {
                 currentParamObj[finalKey].value = actualAudioValue;
             } else {
                 currentParamObj[finalKey] = actualAudioValue;
             }
+            /* END FIX 2 */
+
         } catch (e) { console.warn("Error updating internal params:", paramPath, e); }
 
         // Update Web Audio Node
@@ -962,6 +980,7 @@
             const rampTime = 0.010; // Short ramp for smooth transitions
 
             try {
+                // Use actualAudioValue for direct node updates, except where index is needed indirectly
                 const valueToSet = actualAudioValue;
 
                 if (paramPath === 'masterGain.gain.value' && masterGain) masterGain.gain.setTargetAtTime(valueToSet, now, rampTime);
@@ -985,6 +1004,7 @@
                 else if (paramPath === 'vco2.type' && vco2) vco2.type = valueToSet;
                 else if ((paramPath === 'vco1.octave' || paramPath === 'vco2.octave') && currentNote !== null) {
                     // Recalculate and set frequency if a note is playing
+                    // This correctly uses the index stored in params.vcoX.octave via calculateVcoFrequency
                     const targetOsc1Freq = calculateVcoFrequency(currentFrequency, params.vco1);
                     const targetOsc2Freq = calculateVcoFrequency(currentFrequency, params.vco2);
                      if (vco1) vco1.frequency.setTargetAtTime(targetOsc1Freq, now, rampTime * 2);
