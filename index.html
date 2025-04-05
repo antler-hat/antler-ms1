@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Polivoks Web Synth</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="synth-panel" id="synth-panel">
+    <!-- LFO -->
+    <div class="module" id="lfo-module">
+        <div class="module-title">LFO</div>
+        <div class="control-group">
+            <label for="lfo-speed">Speed</label>
+            <div class="knob" id="lfo-speed" data-param="lfo.frequency.value" data-min="0.1" data-max="30" data-value="5" tabindex="0"></div>
+        </div>
+        <div class="control-group">
+            <label for="lfo-waveshape">Waveshape</label>
+            <div class="knob" id="lfo-waveshape" data-param="lfo.type" data-steps="square,sawtooth,triangle,sine" data-value="0" tabindex="0"></div>
+             <span class="waveform-label" id="lfo-shape-indicator">■</span>
+        </div>
+    </div>
+
+    <!-- Main Controls (Tune, Volume etc) -->
+    <div class="module" id="main-controls-module">
+        <!-- Removed Phones Knob -->
+        <div class="control-group">
+            <label for="tune">Tune</label>
+            <div class="knob" id="tune" data-param="masterTune" data-min="-100" data-max="100" data-value="0" tabindex="0"></div>
+        </div>
+         <div class="control-group">
+            <label>Mode</label>
+            <div class="switch" id="voice-mode" data-state="down" tabindex="0" title="Voice Mode (Not Implemented)">
+                 <div class="switch-handle"></div>
+            </div>
+             <label style="font-size:0.6em;">1-voice / 2-voice</label>
+        </div>
+        <div class="control-group">
+            <label for="glissando">Glissando</label>
+            <div class="knob" id="glissando" data-param="portamentoTime" data-min="0" data-max="0.5" data-value="0" tabindex="0"></div>
+        </div>
+        <div class="control-group">
+            <label for="volume">Volume</label> <!-- Now the main volume -->
+            <div class="knob" id="volume" data-param="masterGain.gain.value" data-min="0" data-max="1" data-value="0.5" tabindex="0"></div>
+        </div>
+         <div class="control-group">
+             <label>Out</label>
+             <div class="switch" id="out-switch" data-state="down" tabindex="0" title="Output Switch (Not Implemented)">
+                 <div class="switch-handle"></div>
+            </div>
+         </div>
+    </div>
+
+    <!-- VCO 1 -->
+    <div class="module" id="vco1-module">
+        <div class="module-title">VCO 1</div>
+        <div class="control-group-horizontal">
+            <div class="control-group">
+                <label for="vco1-octave">Octave</label>
+                <div class="knob" id="vco1-octave" data-param="vco1.octave" data-steps="32,16,8,4,2" data-value="2" tabindex="0"></div>
+                 <span class="waveform-label" id="vco1-octave-indicator">8'</span>
+            </div>
+            <div class="control-group">
+                <label for="vco1-waveshape">Waveshape</label>
+                <div class="knob" id="vco1-waveshape" data-param="vco1.type" data-steps="triangle,sawtooth,square,sine" data-value="1" tabindex="0"></div>
+                 <span class="waveform-label" id="vco1-shape-indicator">╱</span> <!-- Approx Saw -->
+            </div>
+        </div>
+        <div class="control-group-horizontal">
+             <div class="control-group">
+                <label for="vco1-lfo-level">LFO Level</label>
+                <div class="knob" id="vco1-lfo-level" data-param="vco1LfoGain.gain.value" data-min="0" data-max="50" data-value="0" tabindex="0"></div> <!-- LFO pitch mod depth in cents -->
+            </div>
+            <div class="control-group">
+                <label for="vco1-xmod">X-MOD</label>
+                <div class="knob" id="vco1-xmod" data-param="dummy.xmod" data-min="0" data-max="1" data-value="0" tabindex="0" title="X-Mod (Not Implemented)"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- VCO 2 -->
+    <div class="module" id="vco2-module">
+        <div class="module-title">VCO 2</div>
+         <div class="control-group-horizontal">
+             <div class="control-group">
+                <label for="vco2-octave">Octave</label>
+                <div class="knob" id="vco2-octave" data-param="vco2.octave" data-steps="32,16,8,4,2" data-value="2" tabindex="0"></div>
+                 <span class="waveform-label" id="vco2-octave-indicator">8'</span>
+            </div>
+            <div class="control-group">
+                <label for="vco2-waveshape">Waveshape</label>
+                <div class="knob" id="vco2-waveshape" data-param="vco2.type" data-steps="triangle,sawtooth,square,sine" data-value="1" tabindex="0"></div>
+                 <span class="waveform-label" id="vco2-shape-indicator">╱</span>
+            </div>
+         </div>
+         <div class="control-group-horizontal">
+             <div class="control-group">
+                <label for="vco2-lfo-level">LFO Level</label>
+                <div class="knob" id="vco2-lfo-level" data-param="vco2LfoGain.gain.value" data-min="0" data-max="50" data-value="0" tabindex="0"></div> <!-- LFO pitch mod depth in cents -->
+            </div>
+            <div class="control-group">
+                <label for="vco2-detune">Detune</label>
+                <div class="knob" id="vco2-detune" data-param="vco2.detune.value" data-min="-100" data-max="100" data-value="0" tabindex="0"></div> <!-- Detune in cents -->
+            </div>
+         </div>
+    </div>
+
+    <!-- Mixer -->
+    <div class="module" id="mixer-module">
+        <div class="module-title">MIXER</div>
+        <div class="control-group-horizontal">
+            <div class="control-group">
+                <label for="vco1-level">VCO1 Level</label>
+                <div class="knob" id="vco1-level" data-param="vco1Gain.gain.value" data-min="0" data-max="1" data-value="0.7" tabindex="0"></div>
+            </div>
+            <div class="control-group">
+                <label for="vco2-level">VCO2 Level</label>
+                <div class="knob" id="vco2-level" data-param="vco2Gain.gain.value" data-min="0" data-max="1" data-value="0.7" tabindex="0"></div>
+            </div>
+         </div>
+        <div class="control-group-horizontal">
+             <div class="control-group">
+                <label for="noise-level">Noise</label>
+                <div class="knob" id="noise-level" data-param="noiseGain.gain.value" data-min="0" data-max="1" data-value="0" tabindex="0"></div>
+            </div>
+            <div class="control-group">
+                <label for="reverb-level">Reverb</label> <!-- Was EXT INPUT -->
+                <div class="knob" id="reverb-level" data-param="reverbWetGain.gain.value" data-min="0" data-max="1" data-value="0.2" tabindex="0"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- VCF -->
+    <div class="module" id="vcf-module">
+        <div class="module-title">VCF</div>
+         <div class="adsr-mode-switch">
+             <div class="switch" id="vcf-adsr-mode" data-state="down" tabindex="0" title="VCF ADSR Mode (Not Implemented)">
+                 <div class="switch-handle"></div>
+            </div>
+            <label style="font-size:0.6em;">ADSR Mode</label>
+        </div>
+        <div class="adsr-group">
+            <div class="control-group">
+                <label for="vcf-attack">Attack</label>
+                <div class="knob" id="vcf-attack" data-param="vcfEnv.attack" data-min="0.005" data-max="2" data-value="0.01" data-curve="log" tabindex="0"></div>
+            </div>
+            <div class="control-group">
+                <label for="vcf-decay">Decay</label>
+                <div class="knob" id="vcf-decay" data-param="vcfEnv.decay" data-min="0.005" data-max="2" data-value="0.1" data-curve="log" tabindex="0"></div>
+            </div>
+            <div class="control-group">
+                <label for="vcf-sustain">Sustain</label>
+                <div class="knob" id="vcf-sustain" data-param="vcfEnv.sustain" data-min="0" data-max="1" data-value="0.8" tabindex="0"></div>
+            </div>
+            <div class="control-group">
+                <label for="vcf-release">Release</label>
+                <div class="knob" id="vcf-release" data-param="vcfEnv.release" data-min="0.005" data-max="5" data-value="0.2" data-curve="log" tabindex="0"></div>
+            </div>
+        </div>
+        <div id="vcf-filter-controls">
+            <div class="control-group">
+                <label for="vcf-cutoff">Cutoff</label>
+                <div class="knob" id="vcf-cutoff" data-param="filter.frequency.value" data-min="20" data-max="20000" data-value="20000" data-curve="log" tabindex="0"></div>
+            </div>
+             <div class="control-group">
+                <label for="vcf-res">Res</label>
+                <div class="knob" id="vcf-res" data-param="filter.Q.value" data-min="0" data-max="30" data-value="1" tabindex="0"></div>
+            </div>
+             <div class="control-group">
+                 <label>Mode</label>
+                 <div class="switch" id="vcf-type" data-state="down" data-param="filter.type" data-values="bandpass,lowpass" tabindex="0">
+                     <div class="switch-handle"></div>
+                 </div>
+                 <label style="font-size:0.6em;" id="vcf-type-label">LPF</label>
+             </div>
+        </div>
+         <div id="vcf-mod-controls">
+            <div class="control-group">
+                <label for="vcf-lfo-level">LFO Level</label>
+                <div class="knob" id="vcf-lfo-level" data-param="vcfLfoGain.gain.value" data-min="0" data-max="5000" data-value="0" tabindex="0"></div> <!-- LFO Mod depth in Hz -->
+            </div>
+            <div class="control-group">
+                <label for="vcf-adsr-level">ADSR Level</label>
+                <div class="knob" id="vcf-adsr-level" data-param="vcfEnvGain.gain.value" data-min="-8000" data-max="8000" data-value="4000" tabindex="0"></div> <!-- Env Mod depth in Hz -->
+            </div>
+        </div>
+    </div>
+
+    <!-- VCA -->
+    <div class="module" id="vca-module">
+        <div class="module-title">VCA</div>
+         <div class="adsr-mode-switch">
+             <div class="switch" id="vca-adsr-mode" data-state="down" tabindex="0" title="VCA ADSR Mode (Not Implemented)">
+                 <div class="switch-handle"></div>
+            </div>
+             <label style="font-size:0.6em;">ADSR Mode</label>
+        </div>
+         <div class="adsr-group">
+            <div class="control-group">
+                <label for="vca-attack">Attack</label>
+                <div class="knob" id="vca-attack" data-param="vcaEnv.attack" data-min="0.005" data-max="2" data-value="0.01" data-curve="log" tabindex="0"></div>
+            </div>
+            <div class="control-group">
+                <label for="vca-decay">Decay</label>
+                <div class="knob" id="vca-decay" data-param="vcaEnv.decay" data-min="0.005" data-max="2" data-value="0.1" data-curve="log" tabindex="0"></div>
+            </div>
+            <div class="control-group">
+                <label for="vca-sustain">Sustain</label>
+                <div class="knob" id="vca-sustain" data-param="vcaEnv.sustain" data-min="0" data-max="1" data-value="1" tabindex="0"></div>
+            </div>
+            <div class="control-group">
+                <label for="vca-release">Release</label>
+                <div class="knob" id="vca-release" data-param="vcaEnv.release" data-min="0.005" data-max="5" data-value="0.2" data-curve="log" tabindex="0"></div>
+            </div>
+        </div>
+         <div id="vca-mod-controls">
+             <div class="control-group">
+                <label for="vca-lfo-level">LFO Level</label>
+                <div class="knob" id="vca-lfo-level" data-param="vcaLfoGain.gain.value" data-min="0" data-max="1" data-value="0" tabindex="0"></div> <!-- Tremolo Depth -->
+            </div>
+             <div class="control-group">
+                 <label>Key Follow</label>
+                 <div class="switch" id="key-follow" data-state="down" data-param="keyFollow" tabindex="0">
+                    <div class="switch-handle"></div>
+                 </div>
+                 <label style="font-size:0.6em;" id="key-follow-label">Off</label>
+             </div>
+         </div>
+    </div>
+
+     <!-- Power -->
+    <div class="module" id="power-module">
+         <div class="module-title">SYSTEM</div>
+         <div class="control-group">
+             <label>Power <span id="power-led" class="led"></span></label>
+             <button id="power-button" class="power-button">POWER</button>
+         </div>
+    </div>
+
+</div>
+<script src="script.js"></script>
+</body>
+</html>
