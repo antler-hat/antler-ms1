@@ -4,7 +4,219 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Polivoks Web Synth</title>
-    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* Align to top */
+            min-height: 100vh;
+            padding-top: 20px; /* Add some padding at the top */
+            user-select: none;
+            -webkit-user-select: none;
+             overflow-x: auto;
+        }
+        body.dragging {
+            cursor: ns-resize;
+        }
+
+        .synth-panel {
+            background-color: #000000;
+            border: 2px solid #555;
+            padding: 20px;
+            display: grid;
+            /* *** Updated Grid Layout: 4 Columns *** */
+            grid-template-columns: repeat(4, auto);
+            gap: 20px 15px;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
+             min-width: 800px; /* Adjust min width as needed */
+             width: max-content;
+             cursor: default;
+        }
+
+        .module {
+            border: 1px solid #444;
+            padding: 15px 10px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            min-width: 100px;
+            background-color: #111; /* Slightly different background for modules */
+        }
+
+        .module-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+            color: #ccc;
+            width: 100%;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+            text-align: center;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            width: 100%; /* Ensure control groups take width for alignment */
+        }
+
+         .control-group-horizontal {
+             display: flex;
+             flex-direction: row;
+             align-items: baseline;
+             justify-content: space-around;
+             gap: 10px;
+             width: 100%;
+         }
+
+        label {
+            font-size: 0.7em;
+            text-transform: uppercase;
+            color: #bbb;
+        }
+
+        .knob {
+            width: 40px;
+            height: 40px;
+            background-color: #282828;
+            border: 1px solid #555;
+            border-radius: 50%;
+            position: relative;
+            cursor: ns-resize;
+            outline: none;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
+        }
+
+        .knob:before {
+            content: '';
+            position: absolute;
+            width: 2px;
+            height: 12px;
+            background-color: #eee;
+            top: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            transform-origin: 50% 15px;
+        }
+
+        .knob:focus {
+            box-shadow: 0 0 0 2px #007bff, inset 0 0 5px rgba(0,0,0,0.5);
+        }
+
+        .switch {
+             width: 30px;
+             height: 50px;
+             background-color: #ccc;
+             border: 1px solid #555;
+             cursor: pointer;
+             position: relative;
+             border-radius: 3px;
+             overflow: hidden;
+             outline: none; /* Remove default focus outline */
+        }
+
+        .switch-handle {
+            position: absolute;
+            left: 2px;
+            right: 2px;
+            height: 23px;
+            background-color: #444;
+            border: 1px solid #222;
+            border-radius: 2px;
+            transition: top 0.1s ease-in-out;
+        }
+
+         .switch[data-state="up"] .switch-handle {
+             top: 2px;
+         }
+
+         .switch[data-state="down"] .switch-handle {
+             top: 23px;
+         }
+
+        .switch:focus {
+             box-shadow: 0 0 0 2px #007bff; /* Highlight on focus */
+         }
+
+        /* --- Updated Specific Module Layout (4 columns) --- */
+        #lfo-module { grid-column: 1; grid-row: 1; }
+        #mixer-module { grid-column: 1; grid-row: 2; }
+
+        #vco1-module { grid-column: 2; grid-row: 1; }
+        #vco2-module { grid-column: 2; grid-row: 2; }
+
+        #vcf-module { grid-column: 3; grid-row: 1; }
+        #vca-module { grid-column: 3; grid-row: 2; }
+
+        #system-module { grid-column: 4; grid-row: 1 / span 2; }
+
+
+        /* Adjust VCF/VCA layout (single row now) */
+        #vcf-module, #vca-module {
+            display: flex;
+            flex-direction: column;
+            gap: 15px; /* Adjust gap as needed */
+            align-items: space-around;
+            justify-content: start; /* Space out elements vertically */
+        }
+        #vcf-module .module-title, #vca-module .module-title {
+            grid-column: 1 / -1;
+            margin-bottom: 5px;
+        }
+         .adsr-group {
+             grid-column: 1 / -1; /* ADSR knobs span full width */
+             display: grid;
+             grid-template-columns: repeat(4, 1fr);
+             gap: 5px;
+             justify-items: center;
+             margin-top: 10px; /* Space above ADSR */
+             margin-bottom: 10px;
+         }
+
+         /* VCF Specific */
+        #vcf-filter-controls {
+            grid-column: 1 / -1;
+            display: flex;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        #vcf-mod-controls {
+            grid-column: 1 / -1;
+            display: flex;
+            justify-content: space-around;
+             width: 100%;
+        }
+
+        /* VCA Specific */
+        #vca-mod-controls {
+             grid-column: 1 / -1;
+             display: flex;
+             justify-content: space-around; /* Center remaining control */
+             width: 100%;
+             margin-top: 10px; /* Add space above VCA Mod controls */
+        }
+
+        /* System Module Specific */
+        #system-module {
+            justify-content: start; /* Distribute controls vertically */
+        }
+
+
+        /* Helper class for waveform labels */
+        .waveform-label {
+            font-family: monospace;
+            font-size: 1.2em;
+            line-height: 1;
+            margin-top: 2px; /* Adjust spacing */
+        }
+    </style>
 </head>
 <body>
 
@@ -23,34 +235,25 @@
         </div>
     </div>
 
-    <!-- Main Controls (Tune, Volume etc) -->
-    <div class="module" id="main-controls-module">
-        <!-- Removed Phones Knob -->
-        <div class="control-group">
-            <label for="tune">Tune</label>
-            <div class="knob" id="tune" data-param="masterTune" data-min="-100" data-max="100" data-value="0" tabindex="0"></div>
+     <!-- Mixer -->
+    <div class="module" id="mixer-module">
+        <div class="module-title">MIXER</div>
+        <div class="control-group"> <!-- Vertical Stack -->
+            <label for="vco1-level">VCO1 Level</label>
+            <div class="knob" id="vco1-level" data-param="vco1Gain.gain.value" data-min="0" data-max="1" data-value="0.7" tabindex="0"></div>
         </div>
-         <div class="control-group">
-            <label>Mode</label>
-            <div class="switch" id="voice-mode" data-state="down" tabindex="0" title="Voice Mode (Not Implemented)">
-                 <div class="switch-handle"></div>
-            </div>
-             <label style="font-size:0.6em;">1-voice / 2-voice</label>
+        <div class="control-group"> <!-- Vertical Stack -->
+            <label for="vco2-level">VCO2 Level</label>
+            <div class="knob" id="vco2-level" data-param="vco2Gain.gain.value" data-min="0" data-max="1" data-value="0.7" tabindex="0"></div>
         </div>
-        <div class="control-group">
-            <label for="glissando">Glissando</label>
-            <div class="knob" id="glissando" data-param="portamentoTime" data-min="0" data-max="0.5" data-value="0" tabindex="0"></div>
+        <div class="control-group"> <!-- Vertical Stack -->
+            <label for="noise-level">Noise</label>
+            <div class="knob" id="noise-level" data-param="noiseGain.gain.value" data-min="0" data-max="1" data-value="0" tabindex="0"></div>
         </div>
-        <div class="control-group">
-            <label for="volume">Volume</label> <!-- Now the main volume -->
-            <div class="knob" id="volume" data-param="masterGain.gain.value" data-min="0" data-max="1" data-value="0.5" tabindex="0"></div>
+        <div class="control-group"> <!-- Vertical Stack -->
+            <label for="reverb-level">Reverb Lvl</label>
+            <div class="knob" id="reverb-level" data-param="reverbWetGain.gain.value" data-min="0" data-max="1" data-value="0.2" tabindex="0"></div>
         </div>
-         <div class="control-group">
-             <label>Out</label>
-             <div class="switch" id="out-switch" data-state="down" tabindex="0" title="Output Switch (Not Implemented)">
-                 <div class="switch-handle"></div>
-            </div>
-         </div>
     </div>
 
     <!-- VCO 1 -->
@@ -64,14 +267,14 @@
             </div>
             <div class="control-group">
                 <label for="vco1-waveshape">Waveshape</label>
-                <div class="knob" id="vco1-waveshape" data-param="vco1.type" data-steps="triangle,sawtooth,square,sine" data-value="1" tabindex="0"></div>
-                 <span class="waveform-label" id="vco1-shape-indicator">╱</span> <!-- Approx Saw -->
+                <div class="knob" id="vco1-waveshape" data-param="vco1.type" data-steps="triangle,sawtooth,square,square" data-value="1" tabindex="0"></div>
+                 <span class="waveform-label" id="vco1-shape-indicator">╱</span>
             </div>
         </div>
         <div class="control-group-horizontal">
              <div class="control-group">
                 <label for="vco1-lfo-level">LFO Level</label>
-                <div class="knob" id="vco1-lfo-level" data-param="vco1LfoGain.gain.value" data-min="0" data-max="50" data-value="0" tabindex="0"></div> <!-- LFO pitch mod depth in cents -->
+                <div class="knob" id="vco1-lfo-level" data-param="vco1LfoGain.gain.value" data-min="0" data-max="1  000" data-value="0" tabindex="0"></div> <!-- LFO pitch mod depth in cents -->
             </div>
             <div class="control-group">
                 <label for="vco1-xmod">X-MOD</label>
@@ -91,14 +294,14 @@
             </div>
             <div class="control-group">
                 <label for="vco2-waveshape">Waveshape</label>
-                <div class="knob" id="vco2-waveshape" data-param="vco2.type" data-steps="triangle,sawtooth,square,sine" data-value="1" tabindex="0"></div>
+                <div class="knob" id="vco2-waveshape" data-param="vco2.type" data-steps="triangle,sawtooth,square,square" data-value="1" tabindex="0"></div>
                  <span class="waveform-label" id="vco2-shape-indicator">╱</span>
             </div>
          </div>
          <div class="control-group-horizontal">
              <div class="control-group">
                 <label for="vco2-lfo-level">LFO Level</label>
-                <div class="knob" id="vco2-lfo-level" data-param="vco2LfoGain.gain.value" data-min="0" data-max="50" data-value="0" tabindex="0"></div> <!-- LFO pitch mod depth in cents -->
+                <div class="knob" id="vco2-lfo-level" data-param="vco2LfoGain.gain.value" data-min="0" data-max="1  000" data-value="0" tabindex="0"></div> <!-- LFO pitch mod depth in cents -->
             </div>
             <div class="control-group">
                 <label for="vco2-detune">Detune</label>
@@ -107,39 +310,25 @@
          </div>
     </div>
 
-    <!-- Mixer -->
-    <div class="module" id="mixer-module">
-        <div class="module-title">MIXER</div>
-        <div class="control-group-horizontal">
-            <div class="control-group">
-                <label for="vco1-level">VCO1 Level</label>
-                <div class="knob" id="vco1-level" data-param="vco1Gain.gain.value" data-min="0" data-max="1" data-value="0.7" tabindex="0"></div>
-            </div>
-            <div class="control-group">
-                <label for="vco2-level">VCO2 Level</label>
-                <div class="knob" id="vco2-level" data-param="vco2Gain.gain.value" data-min="0" data-max="1" data-value="0.7" tabindex="0"></div>
-            </div>
-         </div>
-        <div class="control-group-horizontal">
-             <div class="control-group">
-                <label for="noise-level">Noise</label>
-                <div class="knob" id="noise-level" data-param="noiseGain.gain.value" data-min="0" data-max="1" data-value="0" tabindex="0"></div>
-            </div>
-            <div class="control-group">
-                <label for="reverb-level">Reverb</label> <!-- Was EXT INPUT -->
-                <div class="knob" id="reverb-level" data-param="reverbWetGain.gain.value" data-min="0" data-max="1" data-value="0.2" tabindex="0"></div>
-            </div>
-        </div>
-    </div>
-
     <!-- VCF -->
     <div class="module" id="vcf-module">
         <div class="module-title">VCF</div>
-         <div class="adsr-mode-switch">
-             <div class="switch" id="vcf-adsr-mode" data-state="down" tabindex="0" title="VCF ADSR Mode (Not Implemented)">
-                 <div class="switch-handle"></div>
+        <div id="vcf-filter-controls">
+            <div class="control-group">
+                <label for="vcf-cutoff">Cutoff</label>
+                <div class="knob" id="vcf-cutoff" data-param="filter.frequency.value" data-min="20" data-max="20000" data-value="20000" data-curve="log" tabindex="0"></div>
             </div>
-            <label style="font-size:0.6em;">ADSR Mode</label>
+             <div class="control-group">
+                <label for="vcf-res">Res</label>
+                <div class="knob" id="vcf-res" data-param="filter.Q.value" data-min="0" data-max="30" data-value="1" tabindex="0"></div>
+            </div>
+             <div class="control-group">
+                 <label>Mode</label>
+                 <div class="switch" id="vcf-type" data-state="down" data-param="filter.type" data-values="highpass,lowpass" tabindex="0">
+                     <div class="switch-handle"></div>
+                 </div>
+                 <label style="font-size:0.6em;" id="vcf-type-label">LPF</label>
+             </div>
         </div>
         <div class="adsr-group">
             <div class="control-group">
@@ -159,23 +348,6 @@
                 <div class="knob" id="vcf-release" data-param="vcfEnv.release" data-min="0.005" data-max="5" data-value="0.2" data-curve="log" tabindex="0"></div>
             </div>
         </div>
-        <div id="vcf-filter-controls">
-            <div class="control-group">
-                <label for="vcf-cutoff">Cutoff</label>
-                <div class="knob" id="vcf-cutoff" data-param="filter.frequency.value" data-min="20" data-max="20000" data-value="20000" data-curve="log" tabindex="0"></div>
-            </div>
-             <div class="control-group">
-                <label for="vcf-res">Res</label>
-                <div class="knob" id="vcf-res" data-param="filter.Q.value" data-min="0" data-max="30" data-value="1" tabindex="0"></div>
-            </div>
-             <div class="control-group">
-                 <label>Mode</label>
-                 <div class="switch" id="vcf-type" data-state="down" data-param="filter.type" data-values="bandpass,lowpass" tabindex="0">
-                     <div class="switch-handle"></div>
-                 </div>
-                 <label style="font-size:0.6em;" id="vcf-type-label">LPF</label>
-             </div>
-        </div>
          <div id="vcf-mod-controls">
             <div class="control-group">
                 <label for="vcf-lfo-level">LFO Level</label>
@@ -191,12 +363,6 @@
     <!-- VCA -->
     <div class="module" id="vca-module">
         <div class="module-title">VCA</div>
-         <div class="adsr-mode-switch">
-             <div class="switch" id="vca-adsr-mode" data-state="down" tabindex="0" title="VCA ADSR Mode (Not Implemented)">
-                 <div class="switch-handle"></div>
-            </div>
-             <label style="font-size:0.6em;">ADSR Mode</label>
-        </div>
          <div class="adsr-group">
             <div class="control-group">
                 <label for="vca-attack">Attack</label>
@@ -220,26 +386,891 @@
                 <label for="vca-lfo-level">LFO Level</label>
                 <div class="knob" id="vca-lfo-level" data-param="vcaLfoGain.gain.value" data-min="0" data-max="1" data-value="0" tabindex="0"></div> <!-- Tremolo Depth -->
             </div>
-             <div class="control-group">
-                 <label>Key Follow</label>
-                 <div class="switch" id="key-follow" data-state="down" data-param="keyFollow" tabindex="0">
-                    <div class="switch-handle"></div>
-                 </div>
-                 <label style="font-size:0.6em;" id="key-follow-label">Off</label>
-             </div>
+             <!-- Key Follow Switch Removed -->
          </div>
     </div>
 
-     <!-- Power -->
-    <div class="module" id="power-module">
+     <!-- System Controls -->
+    <div class="module" id="system-module">
          <div class="module-title">SYSTEM</div>
          <div class="control-group">
-             <label>Power <span id="power-led" class="led"></span></label>
-             <button id="power-button" class="power-button">POWER</button>
-         </div>
+            <label for="tune">Tune</label>
+            <div class="knob" id="tune" data-param="masterTune" data-min="-100" data-max="100" data-value="0" tabindex="0"></div>
+        </div>
+        <div class="control-group">
+            <label for="glissando">Glissando</label>
+            <div class="knob" id="glissando" data-param="portamentoTime" data-min="0" data-max="0.5" data-value="0" tabindex="0"></div>
+        </div>
+        <div class="control-group">
+            <label for="volume">Volume</label>
+            <div class="knob" id="volume" data-param="masterGain.gain.value" data-min="0" data-max="1" data-value="0.5" tabindex="0"></div>
+        </div>
     </div>
 
 </div>
-<script src="script.js"></script>
+<script>
+    // ----- SYNTH PANEL ELEMENTS -----
+    const synthPanel = document.getElementById('synth-panel');
+    const knobs = synthPanel.querySelectorAll('.knob');
+    const switches = synthPanel.querySelectorAll('.switch');
+
+    // ----- AUDIO CONTEXT & NODES -----
+    let audioContext;
+    let masterGain;
+    let vco1, vco2; // Persistent Oscillators
+    let vco1Gain, vco2Gain;
+    let noiseSource, noiseGain; // Persistent Noise Source
+    let filter;
+    let vcaGainNode; // Master VCA controlled by envelope
+    let lfo, vco1LfoGain, vco2LfoGain, vcfLfoGain, vcaLfoGain;
+    let vcfEnvGain; // Controls VCF Env -> Filter Freq amount
+    let reverb, reverbWetGain, reverbDryGain;
+
+    let isAudioInitialized = false;
+    let isAudioResumed = false; // Tracks if user interaction has successfully resumed context
+
+    // ----- SYNTH PARAMETERS -----
+    const params = {
+        masterTune: 0, // In cents
+        portamentoTime: 0, // Glide time in seconds
+        vco1: { octave: 2, type: 'sawtooth' }, // Octave Index
+        vco2: { octave: 2, type: 'sawtooth', detune: { value: 0 } }, // Detune in cents
+        vcfEnv: { attack: 0.01, decay: 0.1, sustain: 0.8, release: 0.2 },
+        vcaEnv: { attack: 0.01, decay: 0.1, sustain: 1.0, release: 0.2 },
+        lfo: { frequency: { value: 5 }, type: 'square' },
+        vco1Gain: { gain: { value: 0.7 } },
+        vco2Gain: { gain: { value: 0.7 } },
+        noiseGain: { gain: { value: 0 } },
+        filter: { frequency: { value: 20000 }, Q: { value: 1 }, type: 'lowpass' },
+        vco1LfoGain: { gain: { value: 0 } }, // LFO -> VCO1 Pitch Mod Depth (cents)
+        vco2LfoGain: { gain: { value: 0 } }, // LFO -> VCO2 Pitch Mod Depth (cents)
+        vcfLfoGain: { gain: { value: 0 } }, // LFO -> Filter Freq Mod Depth (Hz)
+        vcaLfoGain: { gain: { value: 0 } }, // LFO -> VCA Mod Depth (Gain units 0-1)
+        vcfEnvGain: { gain: { value: 4000 } }, // VCF Env -> Filter Freq Mod Depth (Hz)
+        reverbWetGain: { gain: { value: 0.2 } },
+        masterGain: { gain: { value: 0.5 } }
+    };
+
+    // ----- CONSTANTS & MAPPINGS -----
+    const octaveSteps = [32, 16, 8, 4, 2]; // For display
+    const octaveMultipliers = [1/8, 1/4, 1/2, 1, 2]; // For calculation
+
+    const vcoWaveforms = ['triangle', 'sawtooth', 'square', 'square']; // Possible values
+    const vcoShapeIndicators = ['△', '╱', '■', '■']; // Display text
+    const lfoWaveforms = ['square', 'sawtooth', 'triangle', 'sine'];
+    const lfoShapeIndicators = ['■', '╱', '△', '〜'];
+    const FILTER_TYPES = ['highpass', 'lowpass']; // For VCF switch
+
+    // ----- MONO SYNTH STATE -----
+    let pressedKeys = {}; // Tracks currently physically held keys { 'KeyCode': true }
+    let currentNote = null; // The MIDI note number currently sounding (or null if silent)
+    let currentFrequency = 0; // Base frequency of the currentNote (before octave/detune)
+    const MIDI_C4 = 69; // Reference MIDI note
+
+    const keyToNoteMap = {
+        'KeyA': 60, 'KeyW': 61, 'KeyS': 62, 'KeyE': 63, 'KeyD': 64, 'KeyF': 65,
+        'KeyT': 66, 'KeyG': 67, 'KeyY': 68, 'KeyH': 69, 'KeyU': 70, 'KeyJ': 71,
+        'KeyK': 72,
+    };
+
+    // ----- UTILITY FUNCTIONS -----
+    function midiToFreq(midiNote) {
+        return 440 * Math.pow(2, (midiNote - MIDI_C4) / 12);
+    }
+
+    function calculateVcoFrequency(baseFreq, vcoParams) {
+        let octaveIndex = vcoParams.octave;
+        if (typeof octaveIndex !== 'number' || isNaN(octaveIndex) || octaveIndex < 0 || octaveIndex >= octaveMultipliers.length) {
+            console.warn(`Invalid VCO Octave Index (${octaveIndex}), defaulting to 2 (8')`);
+            octaveIndex = 2;
+            vcoParams.octave = octaveIndex;
+        }
+        const freq = baseFreq * octaveMultipliers[octaveIndex];
+        const safeFreq = Math.max(20, Math.min((audioContext?.sampleRate || 44100) / 2, freq));
+        if (!isFinite(safeFreq)) {
+            console.error("FATAL: Calculated VCO frequency is non-finite!", freq, baseFreq, octaveIndex);
+            return 440;
+        }
+        return safeFreq;
+    }
+
+    // ----- AUDIO CONTEXT & INITIALIZATION -----
+    async function ensureAudioContextResumed() {
+        if (!audioContext) {
+            console.error("Attempted to resume context, but it's not initialized.");
+            return false;
+        }
+        if (audioContext.state === 'running') {
+            if (!isAudioResumed) isAudioResumed = true;
+            return true;
+        }
+        if (audioContext.state === 'suspended') {
+            console.log("AudioContext suspended. Attempting to resume...");
+            try {
+                await audioContext.resume();
+                if (audioContext.state === 'running') {
+                    console.log("AudioContext Resumed successfully.");
+                    isAudioResumed = true;
+                    return true;
+                } else {
+                    console.warn("AudioContext state is still not 'running' after resume attempt:", audioContext.state);
+                    isAudioResumed = false;
+                    return false;
+                }
+            } catch (e) {
+                console.error("Error resuming AudioContext:", e);
+                isAudioResumed = false;
+                return false;
+            }
+        }
+        console.warn("AudioContext in unexpected state:", audioContext.state);
+        isAudioResumed = false;
+        return false;
+    }
+
+    function initAudio() {
+        if (isAudioInitialized) return;
+        console.log("Initializing AudioContext...");
+        try {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            isAudioInitialized = true;
+            console.log("Initial AudioContext State:", audioContext.state);
+
+            // --- Create Nodes ---
+            masterGain = audioContext.createGain();
+            params.masterGain.node = masterGain;
+
+            vco1 = audioContext.createOscillator(); vco1.type = params.vco1.type;
+            vco2 = audioContext.createOscillator(); vco2.type = params.vco2.type;
+            params.vco1.node = vco1; params.vco2.node = vco2;
+
+            vco1Gain = audioContext.createGain(); vco2Gain = audioContext.createGain();
+            params.vco1Gain.node = vco1Gain; params.vco2Gain.node = vco2Gain;
+
+            const bufferSize = audioContext.sampleRate * 2;
+            const noiseBuffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
+            noiseSource = audioContext.createBufferSource();
+            noiseSource.buffer = noiseBuffer;
+            noiseSource.loop = true;
+            noiseGain = audioContext.createGain();
+            params.noiseGain.node = noiseGain;
+            params.noiseSource = { node: noiseSource };
+
+            lfo = audioContext.createOscillator();
+            params.lfo.node = lfo;
+            vco1LfoGain = audioContext.createGain(); vco2LfoGain = audioContext.createGain();
+            vcfLfoGain = audioContext.createGain(); vcaLfoGain = audioContext.createGain();
+            params.vco1LfoGain.node = vco1LfoGain; params.vco2LfoGain.node = vco2LfoGain;
+            params.vcfLfoGain.node = vcfLfoGain; params.vcaLfoGain.node = vcaLfoGain;
+
+            filter = audioContext.createBiquadFilter();
+            params.filter.node = filter;
+
+            vcfEnvGain = audioContext.createGain();
+            params.vcfEnvGain.node = vcfEnvGain;
+
+            vcaGainNode = audioContext.createGain();
+            vcaGainNode.gain.value = 0;
+
+            reverb = audioContext.createConvolver();
+            reverbWetGain = audioContext.createGain();
+            reverbDryGain = audioContext.createGain();
+            params.reverbWetGain.node = reverbWetGain;
+
+            // --- Set Initial Parameters ---
+            masterGain.gain.value = params.masterGain.gain.value;
+            vco1Gain.gain.value = params.vco1Gain.gain.value;
+            vco2Gain.gain.value = params.vco2Gain.gain.value;
+            noiseGain.gain.value = params.noiseGain.gain.value;
+            vco1LfoGain.gain.value = params.vco1LfoGain.gain.value;
+            vco2LfoGain.gain.value = params.vco2LfoGain.gain.value;
+            vcfLfoGain.gain.value = params.vcfLfoGain.gain.value;
+            vcaLfoGain.gain.value = params.vcaLfoGain.gain.value;
+            vcfEnvGain.gain.value = params.vcfEnvGain.gain.value;
+            reverbWetGain.gain.value = params.reverbWetGain.gain.value;
+            reverbDryGain.gain.value = 1.0; // Dry path is always full
+
+            lfo.frequency.value = params.lfo.frequency.value;
+            lfo.type = params.lfo.type;
+            vco1.detune.value = params.masterTune;
+            vco2.detune.value = params.masterTune + params.vco2.detune.value;
+            filter.type = params.filter.type;
+            filter.frequency.value = params.filter.frequency.value;
+            filter.Q.value = params.filter.Q.value;
+            // --- Create Reverb Impulse ---
+            const reverbTime = 1.5, decay = 2.0, sampleRate = audioContext.sampleRate;
+            const length = sampleRate * reverbTime;
+            // Modification 1: Change channel count to 1 for mono
+            const impulse = audioContext.createBuffer(1, length, sampleRate);
+            // Modification 1: Get only one channel
+            const impulseData = impulse.getChannelData(0);
+
+            // Modification 2: Add simple low-pass filtering for darker sound
+            let lastOut = 0.0; // State for the simple filter
+            const alpha = 0.05; // Filter coefficient (lower = darker, e.g., 0.1 to 0.5)
+
+            for (let i = 0; i < length; i++) {
+                const envelope = Math.pow(1 - i / length, decay);
+                // Generate white noise
+                const white = Math.random() * 2 - 1;
+                // Apply simple low-pass filter
+                const filtered = white * alpha + lastOut * (1 - alpha);
+                // Store filtered noise with decay envelope
+                impulseData[i] = filtered * envelope;
+                // Update filter state
+                lastOut = filtered;
+                // Modification 1: Removed impulseR assignment
+            }
+            reverb.buffer = impulse;
+
+            // --- Connect Audio Graph ---
+            lfo.connect(vco1LfoGain); lfo.connect(vco2LfoGain);
+            lfo.connect(vcfLfoGain); lfo.connect(vcaLfoGain);
+            vco1LfoGain.connect(vco1.detune);
+            vco2LfoGain.connect(vco2.detune);
+            vcfLfoGain.connect(filter.frequency);
+            vcaLfoGain.connect(vcaGainNode.gain);
+
+            vcfEnvGain.connect(filter.frequency);
+
+            vco1.connect(vco1Gain);
+            vco2.connect(vco2Gain);
+            noiseSource.connect(noiseGain);
+
+            vco1Gain.connect(filter);
+            vco2Gain.connect(filter);
+            noiseGain.connect(filter);
+
+            filter.connect(vcaGainNode);
+
+            vcaGainNode.connect(reverbDryGain); // VCA -> Dry path
+            vcaGainNode.connect(reverb);        // VCA -> Reverb input
+
+            reverb.connect(reverbWetGain);      // Reverb -> Wet gain
+            reverbDryGain.connect(masterGain);  // Dry path -> Master
+            reverbWetGain.connect(masterGain);  // Wet path -> Master
+
+            masterGain.connect(audioContext.destination);
+
+            // --- Start Persistent Oscillators ---
+            lfo.start();
+            vco1.start();
+            vco2.start();
+            noiseSource.start();
+
+            // --- Final State Check ---
+            if (audioContext.state === 'running') {
+                isAudioResumed = true;
+                console.log("Audio graph initialized and context is running.");
+            } else {
+                isAudioResumed = false;
+                console.log("Audio graph initialized, but context is suspended. Requires user interaction.");
+            }
+            updateAllKnobs(true);
+            updateAllSwitches(true);
+
+        } catch (e) {
+            console.error("Error initializing Web Audio API:", e);
+            alert("Web Audio API initialization failed. Your browser might not support it or an error occurred.");
+            isAudioInitialized = false;
+        }
+    }
+
+    // ----- ENVELOPE FUNCTIONS -----
+    function triggerEnvelope(envParams, targetParam, sustainValue, now, isVcf = false) {
+        if (!audioContext || !targetParam) return;
+        const { attack, decay } = envParams;
+        const safeAttack = Math.max(0.001, attack);
+        const safeDecay = Math.max(0.001, decay);
+
+        targetParam.cancelScheduledValues(now);
+
+        if (isVcf) {
+            const knobBaseFreq = params.filter.frequency.value;
+            const envModAmount = params.vcfEnvGain.gain.value;
+            // Key follow logic removed
+            const baseFreqWithKeyFollow = Math.max(20, knobBaseFreq); // Use knob value directly
+            const attackPeakFreq = baseFreqWithKeyFollow + envModAmount;
+            const sustainLevelFreq = baseFreqWithKeyFollow + (sustainValue * envModAmount);
+
+            const clampedBaseFreq = Math.min(audioContext.sampleRate / 2, Math.max(20, baseFreqWithKeyFollow));
+            const clampedPeakFreq = Math.min(audioContext.sampleRate / 2, Math.max(20, attackPeakFreq));
+            const clampedSustainFreq = Math.min(audioContext.sampleRate / 2, Math.max(20, sustainLevelFreq));
+
+            targetParam.setValueAtTime(clampedBaseFreq, now);
+            targetParam.linearRampToValueAtTime(clampedPeakFreq, now + safeAttack);
+            targetParam.linearRampToValueAtTime(clampedSustainFreq, now + safeAttack + safeDecay);
+
+        } else { // VCA
+            const peakVal = 1.0;
+            const sustainLevel = Math.max(0.0001, sustainValue);
+            targetParam.setValueAtTime(0.0001, now);
+            targetParam.linearRampToValueAtTime(peakVal, now + safeAttack);
+            targetParam.linearRampToValueAtTime(sustainLevel, now + safeAttack + safeDecay);
+        }
+    }
+
+    function releaseEnvelope(envParams, targetParam, now, isVcf = false) {
+        if (!audioContext || !targetParam) return;
+        const { release } = envParams;
+        const safeRelease = Math.max(0.001, release);
+
+        targetParam.cancelScheduledValues(now);
+
+        let releaseTargetValue;
+        let actualReleaseTime = safeRelease; // Use knob value
+
+        if (isVcf) {
+            const knobBaseFreq = params.filter.frequency.value;
+            // Key follow logic removed
+            const baseFreqWithKeyFollow = Math.max(20, knobBaseFreq); // Use knob value directly
+            releaseTargetValue = Math.min(audioContext.sampleRate / 2, Math.max(20, baseFreqWithKeyFollow));
+        } else { // VCA
+            releaseTargetValue = 0.0001;
+            // Key follow logic for release time removed
+        }
+
+        // Ensure current value is captured before scheduling ramp
+        targetParam.setValueAtTime(targetParam.value, now);
+        targetParam.linearRampToValueAtTime(releaseTargetValue, now + actualReleaseTime);
+    }
+
+    function triggerEnvelopes(now) {
+        if (!filter || !vcaGainNode) return;
+        triggerEnvelope(params.vcfEnv, filter.frequency, params.vcfEnv.sustain, now, true);
+        triggerEnvelope(params.vcaEnv, vcaGainNode.gain, params.vcaEnv.sustain, now, false);
+    }
+
+    function releaseEnvelopes(now) {
+         if (!filter || !vcaGainNode) return;
+         releaseEnvelope(params.vcfEnv, filter.frequency, now, true);
+         releaseEnvelope(params.vcaEnv, vcaGainNode.gain, now, false);
+    }
+
+
+    // ----- MONOPHONIC NOTE HANDLING -----
+
+    function noteOn(note, freq) {
+        if (!audioContext || audioContext.state !== 'running' || !vco1 || !vco2) {
+            console.warn("noteOn called but audio context not running or VCOs not ready!");
+            return;
+        }
+
+        const now = audioContext.currentTime;
+        const portamento = params.portamentoTime > 0.005 ? params.portamentoTime : 0;
+
+        const targetOsc1Freq = calculateVcoFrequency(freq, params.vco1);
+        const targetOsc2Freq = calculateVcoFrequency(freq, params.vco2);
+
+        if (currentNote !== null) {
+            // Note Transition
+            currentFrequency = freq;
+            currentNote = note;
+
+            if (portamento > 0) {
+                vco1.frequency.cancelScheduledValues(now);
+                vco2.frequency.cancelScheduledValues(now);
+                vco1.frequency.setTargetAtTime(targetOsc1Freq, now, portamento / 4);
+                vco2.frequency.setTargetAtTime(targetOsc2Freq, now, portamento / 4);
+            } else {
+                vco1.frequency.cancelScheduledValues(now);
+                vco2.frequency.cancelScheduledValues(now);
+                vco1.frequency.setValueAtTime(targetOsc1Freq, now);
+                vco2.frequency.setValueAtTime(targetOsc2Freq, now);
+            }
+            triggerEnvelopes(now);
+
+        } else {
+            // First Note
+            currentFrequency = freq;
+            currentNote = note;
+
+            vco1.frequency.cancelScheduledValues(now);
+            vco2.frequency.cancelScheduledValues(now);
+            vco1.frequency.setValueAtTime(targetOsc1Freq, now);
+            vco2.frequency.setValueAtTime(targetOsc2Freq, now);
+            triggerEnvelopes(now);
+        }
+    }
+
+    function noteOff(note) {
+        if (!isAudioInitialized || !isAudioResumed || currentNote === null || !vco1 || !vco2) {
+            return;
+        }
+
+        const remainingHeldCodes = Object.keys(pressedKeys).filter(code => pressedKeys[code] && keyToNoteMap[code]);
+
+        if (note === currentNote) {
+            if (remainingHeldCodes.length > 0) {
+                // Transition to another held note (Last Note Priority)
+                let lastNote = -1;
+                let lastNoteFreq = 0;
+                remainingHeldCodes.forEach(code => {
+                    const heldNote = keyToNoteMap[code];
+                    lastNote = heldNote;
+                    lastNoteFreq = midiToFreq(lastNote);
+                });
+
+                const now = audioContext.currentTime;
+                const portamento = params.portamentoTime > 0.005 ? params.portamentoTime : 0;
+
+                const targetOsc1Freq = calculateVcoFrequency(lastNoteFreq, params.vco1);
+                const targetOsc2Freq = calculateVcoFrequency(lastNoteFreq, params.vco2);
+
+                currentFrequency = lastNoteFreq;
+                currentNote = lastNote;
+
+                if (portamento > 0) {
+                    vco1.frequency.cancelScheduledValues(now);
+                    vco2.frequency.cancelScheduledValues(now);
+                    vco1.frequency.setTargetAtTime(targetOsc1Freq, now, portamento / 4);
+                    vco2.frequency.setTargetAtTime(targetOsc2Freq, now, portamento / 4);
+                } else {
+                    vco1.frequency.cancelScheduledValues(now);
+                    vco2.frequency.cancelScheduledValues(now);
+                    vco1.frequency.setValueAtTime(targetOsc1Freq, now);
+                    vco2.frequency.setValueAtTime(targetOsc2Freq, now);
+                }
+                // NO envelope release/trigger here for legato transition
+
+            } else {
+                // Last key released
+                const now = audioContext.currentTime;
+                releaseEnvelopes(now);
+                currentNote = null;
+                currentFrequency = 0;
+            }
+        }
+    }
+
+
+    // ----- UI UPDATE FUNCTIONS -----
+    function updateKnobVisual(knob, value) {
+        const min = parseFloat(knob.dataset.min);
+        const max = parseFloat(knob.dataset.max);
+        const steps = knob.dataset.steps ? knob.dataset.steps.split(',') : null;
+        let percentage;
+        const numericValue = parseFloat(value);
+
+        knob.dataset.value = steps ? Math.round(numericValue).toString() : numericValue.toFixed(5);
+
+        if (steps) {
+            const stepIndex = Math.max(0, Math.min(steps.length - 1, Math.round(numericValue)));
+            percentage = steps.length > 1 ? stepIndex / (steps.length - 1) : 0.5;
+
+            if (knob.id === 'vco1-waveshape') document.getElementById('vco1-shape-indicator').textContent = vcoShapeIndicators[stepIndex] || '?';
+            if (knob.id === 'vco2-waveshape') document.getElementById('vco2-shape-indicator').textContent = vcoShapeIndicators[stepIndex] || '?';
+            if (knob.id === 'lfo-waveshape') document.getElementById('lfo-shape-indicator').textContent = lfoShapeIndicators[stepIndex] || '?';
+            if (knob.id === 'vco1-octave') document.getElementById('vco1-octave-indicator').textContent = octaveSteps[stepIndex] ? octaveSteps[stepIndex] + "'" : '?';
+            if (knob.id === 'vco2-octave') document.getElementById('vco2-octave-indicator').textContent = octaveSteps[stepIndex] ? octaveSteps[stepIndex] + "'" : '?';
+
+        } else {
+            const range = max - min;
+            percentage = range !== 0 ? (numericValue - min) / range : 0.5;
+        }
+
+        percentage = Math.max(0, Math.min(1, percentage));
+        const rotation = -135 + (percentage * 270);
+        knob.style.transform = `rotate(${rotation}deg)`;
+    }
+
+    function updateSwitchVisual(sw) {
+        const state = sw.dataset.state; // 'up' or 'down'
+        const handle = sw.querySelector('.switch-handle');
+        if (handle) handle.style.top = state === 'up' ? '2px' : '23px';
+
+        const labelId = sw.id + '-label';
+        const labelElement = document.getElementById(labelId);
+        if (!labelElement) return;
+
+        if (sw.dataset.values) {
+            const values = sw.dataset.values.split(',');
+            const text = state === 'up' ? values[0] : values[1];
+            labelElement.textContent = text.substring(0,3).toUpperCase(); // e.g., HIG, LOW
+        // keyFollow removed
+        } else {
+            // Handle other specific switches if needed, otherwise default:
+            labelElement.textContent = state === 'up' ? 'UP' : 'DOWN';
+        }
+    }
+
+    function updateParameter(knobOrSwitch, newValue, forceUpdate = false) {
+        const element = knobOrSwitch;
+        const paramPath = element.dataset.param;
+        const isKnob = element.classList.contains('knob');
+        const isSwitch = element.classList.contains('switch');
+
+        if (!paramPath || paramPath === 'dummy.xmod') return;
+
+        let targetValue = newValue;
+        let actualAudioValue;
+
+        if (isKnob) {
+            const min = parseFloat(element.dataset.min);
+            const max = parseFloat(element.dataset.max);
+            const steps = element.dataset.steps ? element.dataset.steps.split(',') : null;
+            const numericNewValue = parseFloat(newValue);
+
+            if (steps) {
+                const stepIndex = Math.max(0, Math.min(steps.length - 1, Math.round(numericNewValue)));
+                targetValue = stepIndex;
+                const stepValueStr = steps[stepIndex];
+                actualAudioValue = isNaN(parseFloat(stepValueStr)) ? stepValueStr : parseFloat(stepValueStr);
+            } else {
+                targetValue = numericNewValue;
+                targetValue = Math.max(min, Math.min(max, targetValue));
+                actualAudioValue = targetValue;
+            }
+            updateKnobVisual(element, targetValue);
+
+        } else if (isSwitch) {
+            const state = newValue; // 'up' or 'down'
+            element.dataset.state = state;
+
+            if (element.dataset.values) {
+                const values = element.dataset.values.split(',');
+                actualAudioValue = state === 'up' ? values[0] : values[1];
+            } else {
+                actualAudioValue = state === 'up' ? 1 : 0;
+            }
+            updateSwitchVisual(element);
+            targetValue = actualAudioValue; // Store derived value
+            element.dataset.value = targetValue;
+        }
+
+        // Update Internal Params Object
+        const parts = paramPath.split('.');
+        let currentParamObj = params;
+        try {
+            for (let i = 0; i < parts.length - 1; i++) {
+                if (!currentParamObj[parts[i]]) currentParamObj[parts[i]] = {};
+                currentParamObj = currentParamObj[parts[i]];
+            }
+            const finalKey = parts[parts.length - 1];
+            if (typeof currentParamObj[finalKey] === 'object' && currentParamObj[finalKey] !== null && 'value' in currentParamObj[finalKey] && typeof actualAudioValue === 'number') {
+                currentParamObj[finalKey].value = actualAudioValue;
+            } else {
+                currentParamObj[finalKey] = actualAudioValue;
+            }
+        } catch (e) { console.warn("Error updating internal params:", paramPath, e); }
+
+        // Update Web Audio Node
+        if (isAudioInitialized && (isAudioResumed || forceUpdate) && audioContext) {
+            const now = audioContext.currentTime;
+            const rampTime = 0.010; // Short ramp for smooth transitions
+
+            try {
+                const valueToSet = actualAudioValue;
+
+                if (paramPath === 'masterGain.gain.value' && masterGain) masterGain.gain.setTargetAtTime(valueToSet, now, rampTime);
+                else if (paramPath === 'vco1Gain.gain.value' && vco1Gain) vco1Gain.gain.setTargetAtTime(valueToSet, now, rampTime);
+                else if (paramPath === 'vco2Gain.gain.value' && vco2Gain) vco2Gain.gain.setTargetAtTime(valueToSet, now, rampTime);
+                else if (paramPath === 'noiseGain.gain.value' && noiseGain) noiseGain.gain.setTargetAtTime(valueToSet, now, rampTime);
+                else if (paramPath === 'vco1LfoGain.gain.value' && vco1LfoGain) vco1LfoGain.gain.setTargetAtTime(valueToSet, now, rampTime);
+                else if (paramPath === 'vco2LfoGain.gain.value' && vco2LfoGain) vco2LfoGain.gain.setTargetAtTime(valueToSet, now, rampTime);
+                else if (paramPath === 'vcfLfoGain.gain.value' && vcfLfoGain) vcfLfoGain.gain.setTargetAtTime(valueToSet, now, rampTime);
+                else if (paramPath === 'vcaLfoGain.gain.value' && vcaLfoGain) vcaLfoGain.gain.setTargetAtTime(valueToSet, now, rampTime);
+                else if (paramPath === 'vcfEnvGain.gain.value' && vcfEnvGain) vcfEnvGain.gain.setTargetAtTime(valueToSet, now, rampTime);
+                else if (paramPath === 'reverbWetGain.gain.value' && reverbWetGain) {
+                    reverbWetGain.gain.setTargetAtTime(valueToSet, now, rampTime);
+                }
+                else if (paramPath === 'filter.frequency.value' && filter) filter.frequency.setTargetAtTime(valueToSet, now, rampTime);
+                else if (paramPath === 'filter.Q.value' && filter) filter.Q.setTargetAtTime(valueToSet, now, rampTime);
+                else if (paramPath === 'filter.type' && filter) filter.type = valueToSet;
+                else if (paramPath === 'lfo.frequency.value' && lfo) lfo.frequency.setTargetAtTime(valueToSet, now, rampTime);
+                else if (paramPath === 'lfo.type' && lfo) lfo.type = valueToSet;
+                else if (paramPath === 'vco1.type' && vco1) vco1.type = valueToSet;
+                else if (paramPath === 'vco2.type' && vco2) vco2.type = valueToSet;
+                else if ((paramPath === 'vco1.octave' || paramPath === 'vco2.octave') && currentNote !== null) {
+                    // Recalculate and set frequency if a note is playing
+                    const targetOsc1Freq = calculateVcoFrequency(currentFrequency, params.vco1);
+                    const targetOsc2Freq = calculateVcoFrequency(currentFrequency, params.vco2);
+                     if (vco1) vco1.frequency.setTargetAtTime(targetOsc1Freq, now, rampTime * 2);
+                     if (vco2) vco2.frequency.setTargetAtTime(targetOsc2Freq, now, rampTime * 2);
+                }
+                else if (paramPath === 'masterTune' || paramPath === 'vco2.detune.value') {
+                    if (vco1) vco1.detune.setTargetAtTime(params.masterTune, now, rampTime);
+                    if (vco2) vco2.detune.setTargetAtTime(params.masterTune + params.vco2.detune.value, now, rampTime);
+                }
+                // Envelope params, portamento are used in calculations, no direct node update needed here
+
+            } catch (e) { console.error(`Error setting AudioNode param ${paramPath}:`, e, "Value:", valueToSet); }
+        }
+    }
+
+    function updateAllKnobs(forceUpdate = false) {
+        knobs.forEach(knob => {
+            let value = knob.dataset.value || 0;
+            let numericValue = parseFloat(value);
+            if (knob.dataset.steps) numericValue = parseInt(value);
+            updateParameter(knob, numericValue, forceUpdate);
+        });
+    }
+
+    function updateAllSwitches(forceUpdate = false) {
+        switches.forEach(sw => {
+            const state = sw.dataset.state || 'down';
+            updateParameter(sw, state, forceUpdate);
+        });
+    }
+
+    // ----- EVENT LISTENERS -----
+
+    // -- Keyboard Input --
+    let arrowKeyDown = null;
+    let shiftKeyDown = false;
+    let intervalId = null;
+
+    function handleKnobInteraction(knob, adjustmentFn) {
+        const min = parseFloat(knob.dataset.min);
+        const max = parseFloat(knob.dataset.max);
+        const steps = knob.dataset.steps ? knob.dataset.steps.split(',') : null;
+        let currentValue = parseFloat(knob.dataset.value);
+
+        let newValue;
+
+        if (steps) {
+            // For stepped knobs, adjustmentFn provides the *change* in steps
+            let currentStepIndex = Math.round(currentValue);
+            newValue = currentStepIndex + adjustmentFn(0, 1); // Use 1 as the base step change
+            newValue = Math.max(0, Math.min(steps.length - 1, newValue)); // Clamp index
+        } else {
+            let range = max - min; if (range <= 0) range = 1;
+            let stepAmount = range / 100; // Base step for linear knobs
+            newValue = adjustmentFn(currentValue, stepAmount); // adjustmentFn provides new value
+            newValue = Math.max(min, Math.min(max, newValue)); // Clamp value
+        }
+
+        if (Math.abs(newValue - currentValue) > 1e-9) {
+            updateParameter(knob, newValue);
+        }
+    }
+
+    function handleArrowPress(knob, direction, isShift) {
+        const steps = knob.dataset.steps ? knob.dataset.steps.split(',') : null;
+        if (steps) {
+            // Stepped knob: Adjust by index
+            const stepChange = (direction === 'left' ? -1 : 1) * (isShift ? 2 : 1);
+            handleKnobInteraction(knob, (current, step) => stepChange);
+        } else {
+            // Linear knob: Adjust by value
+            const multiplier = isShift ? 10 : 1;
+            handleKnobInteraction(knob, (current, step) => {
+                const effectiveStep = step * multiplier;
+                return direction === 'left' ? current - effectiveStep : current + effectiveStep;
+            });
+        }
+    }
+
+    function startArrowRepeat(knob, direction, isShift) {
+        stopArrowRepeat();
+        handleArrowPress(knob, direction, isShift);
+        intervalId = setInterval(() => {
+            if (!arrowKeyDown) {
+                 stopArrowRepeat();
+                 return;
+            }
+            handleArrowPress(knob, direction, isShift);
+        }, 75);
+    }
+
+    function stopArrowRepeat() {
+        clearInterval(intervalId);
+        intervalId = null;
+    }
+
+    document.addEventListener('keydown', async (e) => {
+        if (document.activeElement && document.activeElement.classList.contains('knob')) {
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                e.preventDefault();
+                const direction = e.key === 'ArrowLeft' ? 'left' : 'right';
+                const newShiftState = e.shiftKey;
+                if (arrowKeyDown !== direction || shiftKeyDown !== newShiftState || !intervalId) {
+                    arrowKeyDown = direction;
+                    shiftKeyDown = newShiftState;
+                    startArrowRepeat(document.activeElement, direction, shiftKeyDown);
+                }
+                return;
+            }
+        }
+         if (e.key === 'Shift') shiftKeyDown = true;
+
+        if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+        const note = keyToNoteMap[e.code];
+        if (!note || pressedKeys[e.code] || e.repeat) return;
+
+        e.preventDefault();
+
+        let canPlay = isAudioResumed;
+        if (!canPlay && isAudioInitialized) {
+            canPlay = await ensureAudioContextResumed();
+        }
+
+        if (canPlay) {
+            pressedKeys[e.code] = true;
+            const freq = midiToFreq(note);
+            noteOn(note, freq);
+        } else if (isAudioInitialized) {
+            console.warn("Audio Context not running. Please click the synth panel first.");
+        } else {
+            console.error("Audio not initialized. Cannot play note.");
+        }
+    });
+
+    document.addEventListener('keyup', (e) => {
+        if (document.activeElement && document.activeElement.classList.contains('knob')) {
+            if ((e.key === 'ArrowLeft' && arrowKeyDown === 'left') || (e.key === 'ArrowRight' && arrowKeyDown === 'right')) {
+                arrowKeyDown = null;
+                stopArrowRepeat();
+            }
+        }
+        if (e.key === 'Shift') {
+            shiftKeyDown = false;
+            if (arrowKeyDown && intervalId && document.activeElement && document.activeElement.classList.contains('knob')) {
+                startArrowRepeat(document.activeElement, arrowKeyDown, false);
+            }
+        }
+
+        const note = keyToNoteMap[e.code];
+        if (note && pressedKeys[e.code]) {
+            pressedKeys[e.code] = false;
+            noteOff(note);
+        }
+    });
+
+    window.addEventListener('blur', () => {
+        if (currentNote !== null && audioContext) {
+            const now = audioContext.currentTime;
+            if (now > 0) releaseEnvelopes(now);
+            currentNote = null;
+            currentFrequency = 0;
+        }
+        pressedKeys = {};
+        arrowKeyDown = null;
+        stopArrowRepeat();
+        if (isDragging) stopDrag();
+    });
+
+    // -- Mouse Input for Knobs --
+    let isDragging = false;
+    let dragKnob = null;
+    let startY = 0;
+    let startValue = 0; // For linear knobs
+    let startStepIndex = 0; // For stepped knobs
+
+    function handleKnobMouseMove(e) {
+        if (!isDragging || !dragKnob) return;
+        e.preventDefault();
+        const currentY = e.clientY;
+        const deltaY = startY - currentY; // Drag up increases value
+
+        const steps = dragKnob.dataset.steps ? dragKnob.dataset.steps.split(',') : null;
+
+        if (steps) {
+            // Stepped knob sensitivity
+            const pixelsPerStep = 20;
+            const stepChange = Math.round(deltaY / pixelsPerStep);
+            let newStepIndex = startStepIndex + stepChange;
+            newStepIndex = Math.max(0, Math.min(steps.length - 1, newStepIndex)); // Clamp index
+
+            // Only update if index actually changed
+            if (newStepIndex !== Math.round(parseFloat(dragKnob.dataset.value))) {
+                 updateParameter(dragKnob, newStepIndex);
+            }
+
+        } else {
+            // Linear knob logic
+            handleKnobInteraction(dragKnob, (current, step) => {
+                const min = parseFloat(dragKnob.dataset.min);
+                const max = parseFloat(dragKnob.dataset.max);
+                const range = max - min;
+                const sensitivityFactor = 1.0;
+                const dragSensitivity = 1.8;
+                const changePerPixel = (range > 0 ? range / 150 : 1 / 150) * dragSensitivity * sensitivityFactor;
+                let valueChange = deltaY * changePerPixel;
+                let newValue = startValue + valueChange;
+                return newValue; // Clamping happens in handleKnobInteraction
+            });
+        }
+    }
+
+    function stopDrag() {
+        if (isDragging) {
+            isDragging = false;
+            dragKnob = null;
+            document.body.classList.remove('dragging');
+            document.removeEventListener('mousemove', handleKnobMouseMove);
+            document.removeEventListener('mouseup', stopDrag);
+            document.removeEventListener('mouseleave', stopDrag);
+        }
+    }
+
+    knobs.forEach(knob => {
+        knob.addEventListener('mousedown', (e) => {
+            if (!isAudioResumed && isAudioInitialized) ensureAudioContextResumed();
+
+            e.preventDefault();
+            isDragging = true;
+            dragKnob = knob;
+            startY = e.clientY;
+            startValue = parseFloat(knob.dataset.value);
+            startStepIndex = Math.round(startValue);
+            document.body.classList.add('dragging');
+            document.addEventListener('mousemove', handleKnobMouseMove);
+            document.addEventListener('mouseup', stopDrag);
+            document.addEventListener('mouseleave', stopDrag);
+            knob.focus();
+        });
+
+        knob.addEventListener('dblclick', (e) => {
+            // Reset knob to its initial value on double click
+            let defaultValue = parseFloat(knob.getAttribute('data-value') || '0');
+             if (knob.dataset.steps) defaultValue = parseInt(knob.getAttribute('data-value') || '0');
+             updateParameter(knob, defaultValue);
+        });
+    });
+
+
+    // -- Switch Click/Key --
+    switches.forEach(sw => {
+        const triggerSwitch = () => {
+            if (!isAudioResumed && isAudioInitialized) ensureAudioContextResumed();
+            const currentState = sw.dataset.state;
+            const newState = currentState === 'up' ? 'down' : 'up';
+            updateParameter(sw, newState);
+        };
+        sw.addEventListener('click', triggerSwitch);
+        sw.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                triggerSwitch();
+            }
+        });
+    });
+
+    // -- General Interaction Listener for Audio Context --
+    synthPanel.addEventListener('click', () => {
+        if (!isAudioResumed && isAudioInitialized) ensureAudioContextResumed();
+    }, { capture: true });
+
+    // --- INITIAL SETUP ---
+    document.addEventListener('DOMContentLoaded', () => {
+        // Initialize UI elements first (visuals only)
+        updateAllKnobs(false);
+        updateAllSwitches(false);
+
+        // Initialize audio graph and parameters
+        initAudio();
+
+        console.log("Mono Synth Ready. Click panel or press keys (A, W, S, E, D, F, T, G, Y, H, U, J, K) to start audio and play.");
+        if (isAudioInitialized && audioContext?.state === 'suspended') {
+            console.warn("REMINDER: Click the synth panel or press a key to enable audio playback.");
+        }
+    });
+
+</script>
 </body>
 </html>
