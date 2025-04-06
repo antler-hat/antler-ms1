@@ -5,10 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Polivoks Web Synth</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Mono&display=swap');
+    </style>
+    <style>
         body {
             background-color: #1a1a1a;
             color: #ffffff;
-            font-family: 'Arial', sans-serif;
+            font-family: "Space Mono", sans-serif;
             display: flex;
             justify-content: center;
             align-items: flex-start; /* Align to top */
@@ -19,7 +22,7 @@
              overflow-x: auto;
         }
         body.dragging {
-            cursor: ns-resize;
+            cursor: ns-resize; /* Might want to change this if dragging becomes more complex */
         }
 
         .synth-panel {
@@ -27,7 +30,7 @@
             border: 2px solid #555;
             padding: 20px;
             display: grid;
-            /* *** Updated Grid Layout: 4 Columns *** */
+            /* 4 Column Grid Layout */
             grid-template-columns: repeat(4, auto);
             gap: 20px 15px;
             box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
@@ -77,9 +80,14 @@
          }
 
         label {
-            font-size: 0.7em;
+            font-size: 0.65em;
+            letter-spacing: .1em;
             text-transform: uppercase;
             color: #bbb;
+        }
+
+        .waveform-label {
+            font-size: 1.5em;
         }
 
         .knob {
@@ -110,9 +118,10 @@
             box-shadow: 0 0 0 2px #007bff, inset 0 0 5px rgba(0,0,0,0.5);
         }
 
+        /* --- Horizontal Switch --- */
         .switch {
-             width: 30px;
-             height: 50px;
+             width: 50px;  /* Wider */
+             height: 30px; /* Shorter */
              background-color: #ccc;
              border: 1px solid #555;
              cursor: pointer;
@@ -124,28 +133,28 @@
 
         .switch-handle {
             position: absolute;
-            left: 2px;
-            right: 2px;
-            height: 23px;
+            top: 2px;      /* Vertical positioning */
+            bottom: 2px;   /* Vertical positioning */
+            width: 23px;   /* Handle width */
             background-color: #444;
             border: 1px solid #222;
             border-radius: 2px;
-            transition: top 0.1s ease-in-out;
+            transition: left 0.1s ease-in-out; /* Animate left property */
         }
 
-         .switch[data-state="up"] .switch-handle {
-             top: 2px;
+         .switch[data-state="up"] .switch-handle { /* 'up' state means left position */
+             left: 2px;
          }
 
-         .switch[data-state="down"] .switch-handle {
-             top: 23px;
+         .switch[data-state="down"] .switch-handle { /* 'down' state means right position */
+             left: 25px; /* 50px total width - 23px handle width - 2px left margin */
          }
 
         .switch:focus {
              box-shadow: 0 0 0 2px #007bff; /* Highlight on focus */
          }
 
-        /* --- Updated Specific Module Layout (4 columns) --- */
+        /* --- Specific Module Layout (4 columns) --- */
         #lfo-module { grid-column: 1; grid-row: 1; }
         #mixer-module { grid-column: 1; grid-row: 2; }
 
@@ -158,7 +167,7 @@
         #system-module { grid-column: 4; grid-row: 1 / span 2; }
 
 
-        /* Adjust VCF/VCA layout (single row now) */
+        /* Adjust VCF/VCA layout */
         #vcf-module, #vca-module {
             display: flex;
             flex-direction: column;
@@ -174,8 +183,8 @@
              grid-column: 1 / -1; /* ADSR knobs span full width */
              display: grid;
              grid-template-columns: repeat(4, 1fr);
+             width: 100%;
              gap: 5px;
-             justify-items: center;
              margin-top: 10px; /* Space above ADSR */
              margin-bottom: 10px;
          }
@@ -183,7 +192,8 @@
          /* VCF Specific */
         #vcf-filter-controls {
             grid-column: 1 / -1;
-            display: flex;
+            display: flex; /* Use flexbox for horizontal alignment */
+            justify-content: space-around; /* Space out controls */
             width: 100%;
             margin-bottom: 10px;
         }
@@ -208,14 +218,6 @@
             justify-content: start; /* Distribute controls vertically */
         }
 
-
-        /* Helper class for waveform labels */
-        .waveform-label {
-            font-family: monospace;
-            font-size: 1.2em;
-            line-height: 1;
-            margin-top: 2px; /* Adjust spacing */
-        }
     </style>
 </head>
 <body>
@@ -229,9 +231,10 @@
             <div class="knob" id="lfo-speed" data-param="lfo.frequency.value" data-min="0.1" data-max="30" data-value="5" tabindex="0"></div>
         </div>
         <div class="control-group">
-            <label for="lfo-waveshape">Waveshape</label>
+            <label for="lfo-waveshape">
+                <span class="waveform-label" id="lfo-shape-indicator">⨅</span>
+            </label>
             <div class="knob" id="lfo-waveshape" data-param="lfo.type" data-steps="square,sawtooth,triangle,sine" data-value="0" tabindex="0"></div>
-             <span class="waveform-label" id="lfo-shape-indicator">■</span>
         </div>
     </div>
 
@@ -250,10 +253,6 @@
             <label for="noise-level">Noise</label>
             <div class="knob" id="noise-level" data-param="noiseGain.gain.value" data-min="0" data-max="1" data-value="0" tabindex="0"></div>
         </div>
-        <div class="control-group"> <!-- Vertical Stack -->
-            <label for="reverb-level">Reverb Lvl</label>
-            <div class="knob" id="reverb-level" data-param="reverbWetGain.gain.value" data-min="0" data-max="1" data-value="0.2" tabindex="0"></div>
-        </div>
     </div>
 
     <!-- VCO 1 -->
@@ -261,24 +260,22 @@
         <div class="module-title">VCO 1</div>
         <div class="control-group-horizontal">
             <div class="control-group">
-                <label for="vco1-octave">Octave</label>
+                <label for="vco1-octave">
+                    <span class="waveform-label" id="vco1-octave-indicator">8'</span>
+                </label>
                 <div class="knob" id="vco1-octave" data-param="vco1.octave" data-steps="32,16,8,4,2" data-value="2" tabindex="0"></div>
-                 <span class="waveform-label" id="vco1-octave-indicator">8'</span>
             </div>
             <div class="control-group">
-                <label for="vco1-waveshape">Waveshape</label>
-                <div class="knob" id="vco1-waveshape" data-param="vco1.type" data-steps="triangle,sawtooth,square,square" data-value="1" tabindex="0"></div>
-                 <span class="waveform-label" id="vco1-shape-indicator">╱</span>
+                <label for="vco1-waveshape">
+                    <span class="waveform-label" id="vco1-shape-indicator">⩘</span>
+                </label>
+                <div class="knob" id="vco1-waveshape" data-param="vco1.type" data-steps="triangle,sawtooth,square,sine" data-value="1" tabindex="0"></div>
             </div>
         </div>
         <div class="control-group-horizontal">
              <div class="control-group">
-                <label for="vco1-lfo-level">LFO Level</label>
+                <label for="vco1-lfo-level">LFO</label>
                 <div class="knob" id="vco1-lfo-level" data-param="vco1LfoGain.gain.value" data-min="0" data-max="500" data-value="0" tabindex="0"></div> <!-- LFO pitch mod depth in cents -->
-            </div>
-            <div class="control-group">
-                <label for="vco1-xmod">X-MOD</label>
-                <div class="knob" id="vco1-xmod" data-param="dummy.xmod" data-min="0" data-max="1" data-value="0" tabindex="0" title="X-Mod (Not Implemented)"></div>
             </div>
         </div>
     </div>
@@ -288,19 +285,21 @@
         <div class="module-title">VCO 2</div>
          <div class="control-group-horizontal">
              <div class="control-group">
-                <label for="vco2-octave">Octave</label>
+                <label for="vco2-octave">
+                    <span class="waveform-label" id="vco2-octave-indicator">8'</span>
+                </label>
                 <div class="knob" id="vco2-octave" data-param="vco2.octave" data-steps="32,16,8,4,2" data-value="2" tabindex="0"></div>
-                 <span class="waveform-label" id="vco2-octave-indicator">8'</span>
             </div>
             <div class="control-group">
-                <label for="vco2-waveshape">Waveshape</label>
-                <div class="knob" id="vco2-waveshape" data-param="vco2.type" data-steps="triangle,sawtooth,square,square" data-value="1" tabindex="0"></div>
-                 <span class="waveform-label" id="vco2-shape-indicator">╱</span>
+                <label for="vco2-waveshape">
+                    <span class="waveform-label" id="vco2-shape-indicator">⩘</span>
+                </label>
+                <div class="knob" id="vco2-waveshape" data-param="vco2.type" data-steps="triangle,sawtooth,square,sine" data-value="1" tabindex="0"></div>
             </div>
          </div>
          <div class="control-group-horizontal">
              <div class="control-group">
-                <label for="vco2-lfo-level">LFO Level</label>
+                <label for="vco2-lfo-level">LFO</label>
                 <div class="knob" id="vco2-lfo-level" data-param="vco2LfoGain.gain.value" data-min="0" data-max="500" data-value="0" tabindex="0"></div> <!-- LFO pitch mod depth in cents -->
             </div>
             <div class="control-group">
@@ -313,7 +312,7 @@
     <!-- VCF -->
     <div class="module" id="vcf-module">
         <div class="module-title">VCF</div>
-        <div id="vcf-filter-controls">
+        <div id="vcf-filter-controls"> <!-- This group now uses flex for horizontal layout -->
             <div class="control-group">
                 <label for="vcf-cutoff">Cutoff</label>
                 <div class="knob" id="vcf-cutoff" data-param="filter.frequency.value" data-min="20" data-max="20000" data-value="20000" data-curve="log" tabindex="0"></div>
@@ -322,7 +321,7 @@
                 <label for="vcf-res">Res</label>
                 <div class="knob" id="vcf-res" data-param="filter.Q.value" data-min="0" data-max="30" data-value="1" tabindex="0"></div>
             </div>
-             <div class="control-group">
+             <div class="control-group"> <!-- Container for the horizontal switch and its label -->
                  <label>Mode</label>
                  <div class="switch" id="vcf-type" data-state="down" data-param="filter.type" data-values="highpass,lowpass" tabindex="0">
                      <div class="switch-handle"></div>
@@ -333,29 +332,29 @@
         <div class="adsr-group">
             <div class="control-group">
                 <label for="vcf-attack">Attack</label>
-                <div class="knob" id="vcf-attack" data-param="vcfEnv.attack" data-min="0.005" data-max="2" data-value="0.01" data-curve="log" tabindex="0"></div>
+                <div class="knob" id="vcf-attack" data-param="vcfEnv.attack" data-min="0.005" data-max="2" data-value="0" data-curve="log" tabindex="0"></div>
             </div>
             <div class="control-group">
                 <label for="vcf-decay">Decay</label>
-                <div class="knob" id="vcf-decay" data-param="vcfEnv.decay" data-min="0.005" data-max="2" data-value="0.1" data-curve="log" tabindex="0"></div>
+                <div class="knob" id="vcf-decay" data-param="vcfEnv.decay" data-min="0.005" data-max="2" data-value="1" data-curve="log" tabindex="0"></div>
             </div>
             <div class="control-group">
                 <label for="vcf-sustain">Sustain</label>
-                <div class="knob" id="vcf-sustain" data-param="vcfEnv.sustain" data-min="0" data-max="1" data-value="0.8" tabindex="0"></div>
+                <div class="knob" id="vcf-sustain" data-param="vcfEnv.sustain" data-min="0" data-max="1" data-value="1" tabindex="0"></div>
             </div>
             <div class="control-group">
                 <label for="vcf-release">Release</label>
-                <div class="knob" id="vcf-release" data-param="vcfEnv.release" data-min="0.005" data-max="5" data-value="0.2" data-curve="log" tabindex="0"></div>
+                <div class="knob" id="vcf-release" data-param="vcfEnv.release" data-min="0.005" data-max="5" data-value="0" data-curve="log" tabindex="0"></div>
             </div>
         </div>
          <div id="vcf-mod-controls">
             <div class="control-group">
-                <label for="vcf-lfo-level">LFO Level</label>
+                <label for="vcf-lfo-level">LFO</label>
                 <div class="knob" id="vcf-lfo-level" data-param="vcfLfoGain.gain.value" data-min="0" data-max="5000" data-value="0" tabindex="0"></div> <!-- LFO Mod depth in Hz -->
             </div>
             <div class="control-group">
-                <label for="vcf-adsr-level">ADSR Level</label>
-                <div class="knob" id="vcf-adsr-level" data-param="vcfEnvGain.gain.value" data-min="-8000" data-max="8000" data-value="4000" tabindex="0"></div> <!-- Env Mod depth in Hz -->
+                <label for="vcf-adsr-level">ADSR</label>
+                <div class="knob" id="vcf-adsr-level" data-param="vcfEnvGain.gain.value" data-min="0" data-max="8000" data-value="0" tabindex="0"></div> <!-- Env Mod depth in Hz -->
             </div>
         </div>
     </div>
@@ -366,11 +365,11 @@
          <div class="adsr-group">
             <div class="control-group">
                 <label for="vca-attack">Attack</label>
-                <div class="knob" id="vca-attack" data-param="vcaEnv.attack" data-min="0.005" data-max="2" data-value="0.01" data-curve="log" tabindex="0"></div>
+                <div class="knob" id="vca-attack" data-param="vcaEnv.attack" data-min="0.005" data-max="2" data-value="0" data-curve="log" tabindex="0"></div>
             </div>
             <div class="control-group">
                 <label for="vca-decay">Decay</label>
-                <div class="knob" id="vca-decay" data-param="vcaEnv.decay" data-min="0.005" data-max="2" data-value="0.1" data-curve="log" tabindex="0"></div>
+                <div class="knob" id="vca-decay" data-param="vcaEnv.decay" data-min="0.005" data-max="2" data-value="1" data-curve="log" tabindex="0"></div>
             </div>
             <div class="control-group">
                 <label for="vca-sustain">Sustain</label>
@@ -378,7 +377,7 @@
             </div>
             <div class="control-group">
                 <label for="vca-release">Release</label>
-                <div class="knob" id="vca-release" data-param="vcaEnv.release" data-min="0.005" data-max="5" data-value="0.2" data-curve="log" tabindex="0"></div>
+                <div class="knob" id="vca-release" data-param="vcaEnv.release" data-min="0.005" data-max="5" data-value="0" data-curve="log" tabindex="0"></div>
             </div>
         </div>
          <div id="vca-mod-controls">
@@ -386,7 +385,6 @@
                 <label for="vca-lfo-level">LFO Level</label>
                 <div class="knob" id="vca-lfo-level" data-param="vcaLfoGain.gain.value" data-min="0" data-max="1" data-value="0" tabindex="0"></div> <!-- Tremolo Depth -->
             </div>
-             <!-- Key Follow Switch Removed -->
          </div>
     </div>
 
@@ -398,8 +396,12 @@
             <div class="knob" id="tune" data-param="masterTune" data-min="-100" data-max="100" data-value="0" tabindex="0"></div>
         </div>
         <div class="control-group">
-            <label for="glissando">Glissando</label>
-            <div class="knob" id="glissando" data-param="portamentoTime" data-min="0" data-max="0.5" data-value="0" tabindex="0"></div>
+            <label for="portamento">Portamento</label>
+            <div class="knob" id="portamento" data-param="portamentoTime" data-min="0" data-max="0.5" data-value="0" tabindex="0"></div>
+        </div>
+        <div class="control-group"> <!-- Vertical Stack -->
+            <label for="reverb-level">Reverb</label>
+            <div class="knob" id="reverb-level" data-param="reverbWetGain.gain.value" data-min="0" data-max="1" data-value="0" tabindex="0"></div>
         </div>
         <div class="control-group">
             <label for="volume">Volume</label>
@@ -455,10 +457,10 @@
     const octaveSteps = [32, 16, 8, 4, 2]; // For display
     const octaveMultipliers = [1/8, 1/4, 1/2, 1, 2]; // For calculation
 
-    const vcoWaveforms = ['triangle', 'sawtooth', 'square', 'square']; // Possible values
-    const vcoShapeIndicators = ['△', '╱', '■', '■']; // Display text
+    const vcoWaveforms = ['triangle', 'sawtooth', 'square', 'sine']; // Possible values
+    const vcoShapeIndicators = ['⋀', '⩘', '⨅', '∿']; // Display text
     const lfoWaveforms = ['square', 'sawtooth', 'triangle', 'sine'];
-    const lfoShapeIndicators = ['■', '╱', '△', '〜'];
+    const lfoShapeIndicators = ['⨅', '⩘', '⋀', '∿'];
     const FILTER_TYPES = ['highpass', 'lowpass']; // For VCF switch
 
     // ----- MONO SYNTH STATE -----
@@ -482,11 +484,9 @@
         let octaveIndex = vcoParams.octave; // Get the index (should be 0-4)
 
         // Ensure octaveIndex is a valid number within range, default gracefully if not.
-        // This check is less strict than before, trusting updateParameter more.
         if (typeof octaveIndex !== 'number' || isNaN(octaveIndex) || octaveIndex < 0 || octaveIndex >= octaveMultipliers.length) {
             console.warn(`calculateVcoFrequency received invalid octaveIndex (${octaveIndex}), defaulting to index 2 (8')`);
             octaveIndex = 2; // Default to 8' index
-            // DO NOT modify vcoParams.octave here - let updateParameter handle the source data
         }
 
         const freq = baseFreq * octaveMultipliers[octaveIndex]; // Use the validated/defaulted index
@@ -606,26 +606,19 @@
             // --- Create Reverb Impulse ---
             const reverbTime = 1.5, decay = 2.0, sampleRate = audioContext.sampleRate;
             const length = sampleRate * reverbTime;
-            // Modification 1: Change channel count to 1 for mono
-            const impulse = audioContext.createBuffer(1, length, sampleRate);
-            // Modification 1: Get only one channel
-            const impulseData = impulse.getChannelData(0);
+            const impulse = audioContext.createBuffer(1, length, sampleRate); // Mono impulse
+            const impulseData = impulse.getChannelData(0); // Get the single channel
 
-            // Modification 2: Add simple low-pass filtering for darker sound
-            let lastOut = 0.0; // State for the simple filter
-            const alpha = 0.05; // Filter coefficient (lower = darker, e.g., 0.1 to 0.5)
+            // Simple low-pass filtering for darker sound
+            let lastOut = 0.0;
+            const alpha = 0.05;
 
             for (let i = 0; i < length; i++) {
                 const envelope = Math.pow(1 - i / length, decay);
-                // Generate white noise
                 const white = Math.random() * 2 - 1;
-                // Apply simple low-pass filter
                 const filtered = white * alpha + lastOut * (1 - alpha);
-                // Store filtered noise with decay envelope
                 impulseData[i] = filtered * envelope;
-                // Update filter state
                 lastOut = filtered;
-                // Modification 1: Removed impulseR assignment
             }
             reverb.buffer = impulse;
 
@@ -694,7 +687,6 @@
         if (isVcf) {
             const knobBaseFreq = params.filter.frequency.value;
             const envModAmount = params.vcfEnvGain.gain.value;
-            // Key follow logic removed
             const baseFreqWithKeyFollow = Math.max(20, knobBaseFreq); // Use knob value directly
             const attackPeakFreq = baseFreqWithKeyFollow + envModAmount;
             const sustainLevelFreq = baseFreqWithKeyFollow + (sustainValue * envModAmount);
@@ -728,12 +720,10 @@
 
         if (isVcf) {
             const knobBaseFreq = params.filter.frequency.value;
-            // Key follow logic removed
             const baseFreqWithKeyFollow = Math.max(20, knobBaseFreq); // Use knob value directly
             releaseTargetValue = Math.min(audioContext.sampleRate / 2, Math.max(20, baseFreqWithKeyFollow));
         } else { // VCA
             releaseTargetValue = 0.0001;
-            // Key follow logic for release time removed
         }
 
         // Ensure current value is captured before scheduling ramp
@@ -784,7 +774,7 @@
                 vco1.frequency.setValueAtTime(targetOsc1Freq, now);
                 vco2.frequency.setValueAtTime(targetOsc2Freq, now);
             }
-            triggerEnvelopes(now);
+            triggerEnvelopes(now); // Re-trigger envelope for legato re-articulation
 
         } else {
             // First Note
@@ -883,7 +873,8 @@
     function updateSwitchVisual(sw) {
         const state = sw.dataset.state; // 'up' or 'down'
         const handle = sw.querySelector('.switch-handle');
-        if (handle) handle.style.top = state === 'up' ? '2px' : '23px';
+        // Update position based on horizontal layout ('up' = left, 'down' = right)
+        if (handle) handle.style.left = state === 'up' ? '23px' : '2px';
 
         const labelId = sw.id + '-label';
         const labelElement = document.getElementById(labelId);
@@ -893,10 +884,8 @@
             const values = sw.dataset.values.split(',');
             const text = state === 'up' ? values[0] : values[1];
             labelElement.textContent = text.substring(0,3).toUpperCase(); // e.g., HIG, LOW
-        // keyFollow removed
         } else {
-            // Handle other specific switches if needed, otherwise default:
-            labelElement.textContent = state === 'up' ? 'UP' : 'DOWN';
+            labelElement.textContent = state === 'up' ? 'UP' : 'DOWN'; // Or LEFT/RIGHT if preferred
         }
     }
 
@@ -905,8 +894,6 @@
         const paramPath = element.dataset.param;
         const isKnob = element.classList.contains('knob');
         const isSwitch = element.classList.contains('switch');
-
-        if (!paramPath || paramPath === 'dummy.xmod') return;
 
         let targetValue = newValue; // For knobs, this might be the raw value or step index
         let actualAudioValue;       // The value used by the AudioNode (freq, gain, type string etc)
@@ -940,13 +927,14 @@
 
             if (element.dataset.values) {
                 const values = element.dataset.values.split(',');
+                // Map 'up' (left visual) to first value, 'down' (right visual) to second value
                 actualAudioValue = state === 'up' ? values[0] : values[1];
             } else {
                 actualAudioValue = state === 'up' ? 1 : 0;
             }
             updateSwitchVisual(element);
-            targetValue = actualAudioValue; // Store derived value
-            element.dataset.value = targetValue;
+            targetValue = actualAudioValue; // Store derived value ('highpass'/'lowpass')
+            element.dataset.value = targetValue; // Store the actual value (e.g. 'lowpass') not the state
         }
 
         // Update Internal Params Object
@@ -959,7 +947,6 @@
             }
             const finalKey = parts[parts.length - 1];
 
-            /* START FIX 2: Explicitly store index for octave */
             // For the 'octave' parameter, we MUST store the step index (targetValue)
             if (finalKey === 'octave' && isKnob) {
                 currentParamObj[finalKey] = targetValue; // Ensure index (0-4) is stored
@@ -970,7 +957,6 @@
             } else {
                 currentParamObj[finalKey] = actualAudioValue;
             }
-            /* END FIX 2 */
 
         } catch (e) { console.warn("Error updating internal params:", paramPath, e); }
 
@@ -997,10 +983,10 @@
                 }
                 else if (paramPath === 'filter.frequency.value' && filter) filter.frequency.setTargetAtTime(valueToSet, now, rampTime);
                 else if (paramPath === 'filter.Q.value' && filter) filter.Q.setTargetAtTime(valueToSet, now, rampTime);
-                else if (paramPath === 'filter.type' && filter) filter.type = valueToSet;
+                else if (paramPath === 'filter.type' && filter) filter.type = valueToSet; // Filter type changes immediately
                 else if (paramPath === 'lfo.frequency.value' && lfo) lfo.frequency.setTargetAtTime(valueToSet, now, rampTime);
-                else if (paramPath === 'lfo.type' && lfo) lfo.type = valueToSet;
-                else if (paramPath === 'vco1.type' && vco1) vco1.type = valueToSet;
+                else if (paramPath === 'lfo.type' && lfo) lfo.type = valueToSet; // LFO type changes immediately
+                else if (paramPath === 'vco1.type' && vco1) vco1.type = valueToSet; // VCO types change immediately
                 else if (paramPath === 'vco2.type' && vco2) vco2.type = valueToSet;
                 else if ((paramPath === 'vco1.octave' || paramPath === 'vco2.octave') && currentNote !== null) {
                     // Recalculate and set frequency if a note is playing
@@ -1011,6 +997,7 @@
                      if (vco2) vco2.frequency.setTargetAtTime(targetOsc2Freq, now, rampTime * 2);
                 }
                 else if (paramPath === 'masterTune' || paramPath === 'vco2.detune.value') {
+                    // Update detune values
                     if (vco1) vco1.detune.setTargetAtTime(params.masterTune, now, rampTime);
                     if (vco2) vco2.detune.setTargetAtTime(params.masterTune + params.vco2.detune.value, now, rampTime);
                 }
@@ -1023,8 +1010,12 @@
     function updateAllKnobs(forceUpdate = false) {
         knobs.forEach(knob => {
             let value = knob.dataset.value || 0;
+            // Use the initial 'data-value' from the HTML attribute for the first setup
+            if (forceUpdate && knob.hasAttribute('data-value')) {
+                 value = knob.getAttribute('data-value');
+            }
             let numericValue = parseFloat(value);
-            if (knob.dataset.steps) numericValue = parseInt(value);
+            if (knob.dataset.steps) numericValue = parseInt(value); // Keep index for stepped knobs
             updateParameter(knob, numericValue, forceUpdate);
         });
     }
@@ -1063,6 +1054,7 @@
             newValue = Math.max(min, Math.min(max, newValue)); // Clamp value
         }
 
+        // Use a small tolerance for comparing floating point numbers
         if (Math.abs(newValue - currentValue) > 1e-9) {
             updateParameter(knob, newValue);
         }
@@ -1093,7 +1085,7 @@
                  return;
             }
             handleArrowPress(knob, direction, isShift);
-        }, 75);
+        }, 75); // Repeat speed
     }
 
     function stopArrowRepeat() {
@@ -1102,11 +1094,13 @@
     }
 
     document.addEventListener('keydown', async (e) => {
+        // Handle arrow keys for focused knobs
         if (document.activeElement && document.activeElement.classList.contains('knob')) {
             if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
                 e.preventDefault();
                 const direction = e.key === 'ArrowLeft' ? 'left' : 'right';
                 const newShiftState = e.shiftKey;
+                // Start repeating only if state changes or it's not already repeating
                 if (arrowKeyDown !== direction || shiftKeyDown !== newShiftState || !intervalId) {
                     arrowKeyDown = direction;
                     shiftKeyDown = newShiftState;
@@ -1115,8 +1109,10 @@
                 return;
             }
         }
+        // Track shift key state
          if (e.key === 'Shift') shiftKeyDown = true;
 
+        // Ignore keyboard shortcuts and non-mapped keys
         if (e.metaKey || e.ctrlKey || e.altKey) return;
 
         const note = keyToNoteMap[e.code];
@@ -1124,6 +1120,7 @@
 
         e.preventDefault();
 
+        // Ensure audio context is running before playing
         let canPlay = isAudioResumed;
         if (!canPlay && isAudioInitialized) {
             canPlay = await ensureAudioContextResumed();
@@ -1141,19 +1138,23 @@
     });
 
     document.addEventListener('keyup', (e) => {
+        // Stop arrow key repeat if arrows are released while knob is focused
         if (document.activeElement && document.activeElement.classList.contains('knob')) {
             if ((e.key === 'ArrowLeft' && arrowKeyDown === 'left') || (e.key === 'ArrowRight' && arrowKeyDown === 'right')) {
                 arrowKeyDown = null;
                 stopArrowRepeat();
             }
         }
+        // Update shift state and potentially adjust repeat speed
         if (e.key === 'Shift') {
             shiftKeyDown = false;
+            // If an arrow key is still held down, restart repeat without shift multiplier
             if (arrowKeyDown && intervalId && document.activeElement && document.activeElement.classList.contains('knob')) {
                 startArrowRepeat(document.activeElement, arrowKeyDown, false);
             }
         }
 
+        // Handle note off
         const note = keyToNoteMap[e.code];
         if (note && pressedKeys[e.code]) {
             pressedKeys[e.code] = false;
@@ -1161,17 +1162,18 @@
         }
     });
 
+    // Release note and stop interactions on window blur
     window.addEventListener('blur', () => {
-        if (currentNote !== null && audioContext) {
+        if (currentNote !== null && audioContext && audioContext.state === 'running') {
             const now = audioContext.currentTime;
-            if (now > 0) releaseEnvelopes(now);
+            if (now > 0) releaseEnvelopes(now); // Check now > 0 for safety
             currentNote = null;
             currentFrequency = 0;
         }
-        pressedKeys = {};
+        pressedKeys = {}; // Clear all held keys
         arrowKeyDown = null;
         stopArrowRepeat();
-        if (isDragging) stopDrag();
+        if (isDragging) stopDrag(); // Stop knob dragging if active
     });
 
     // -- Mouse Input for Knobs --
@@ -1191,7 +1193,7 @@
 
         if (steps) {
             // Stepped knob sensitivity
-            const pixelsPerStep = 20;
+            const pixelsPerStep = 20; // Pixels mouse must move vertically for one step change
             const stepChange = Math.round(deltaY / pixelsPerStep);
             let newStepIndex = startStepIndex + stepChange;
             newStepIndex = Math.max(0, Math.min(steps.length - 1, newStepIndex)); // Clamp index
@@ -1199,17 +1201,17 @@
             // Only update if index actually changed
             if (newStepIndex !== Math.round(parseFloat(dragKnob.dataset.value))) {
                  updateParameter(dragKnob, newStepIndex);
+                 // Note: We don't update startStepIndex here, allows continuous dragging
             }
 
         } else {
-            // Linear knob logic
+            // Linear knob logic - call handleKnobInteraction to calculate based on drag delta
             handleKnobInteraction(dragKnob, (current, step) => {
                 const min = parseFloat(dragKnob.dataset.min);
                 const max = parseFloat(dragKnob.dataset.max);
                 const range = max - min;
-                const sensitivityFactor = 1.0;
-                const dragSensitivity = 1.8;
-                const changePerPixel = (range > 0 ? range / 150 : 1 / 150) * dragSensitivity * sensitivityFactor;
+                const dragSensitivity = 1.8; // Adjusts how much drag affects value
+                const changePerPixel = (range > 0 ? range / 150 : 1 / 150) * dragSensitivity;
                 let valueChange = deltaY * changePerPixel;
                 let newValue = startValue + valueChange;
                 return newValue; // Clamping happens in handleKnobInteraction
@@ -1224,30 +1226,31 @@
             document.body.classList.remove('dragging');
             document.removeEventListener('mousemove', handleKnobMouseMove);
             document.removeEventListener('mouseup', stopDrag);
-            document.removeEventListener('mouseleave', stopDrag);
+            document.removeEventListener('mouseleave', stopDrag); // Also stop if mouse leaves window
         }
     }
 
     knobs.forEach(knob => {
         knob.addEventListener('mousedown', (e) => {
+            // Attempt to resume audio context on interaction
             if (!isAudioResumed && isAudioInitialized) ensureAudioContextResumed();
 
-            e.preventDefault();
+            e.preventDefault(); // Prevent text selection
             isDragging = true;
             dragKnob = knob;
             startY = e.clientY;
-            startValue = parseFloat(knob.dataset.value);
-            startStepIndex = Math.round(startValue);
-            document.body.classList.add('dragging');
+            startValue = parseFloat(knob.dataset.value); // Store initial value for linear drag calc
+            startStepIndex = Math.round(startValue); // Store initial index for stepped drag calc
+            document.body.classList.add('dragging'); // Add dragging cursor to body
             document.addEventListener('mousemove', handleKnobMouseMove);
             document.addEventListener('mouseup', stopDrag);
             document.addEventListener('mouseleave', stopDrag);
-            knob.focus();
+            knob.focus(); // Focus the knob for keyboard interaction
         });
 
         knob.addEventListener('dblclick', (e) => {
             // Reset knob to its initial value on double click
-            let defaultValue = parseFloat(knob.getAttribute('data-value') || '0');
+            let defaultValue = parseFloat(knob.getAttribute('data-value') || '0'); // Use HTML attribute as default
              if (knob.dataset.steps) defaultValue = parseInt(knob.getAttribute('data-value') || '0');
              updateParameter(knob, defaultValue);
         });
@@ -1257,6 +1260,7 @@
     // -- Switch Click/Key --
     switches.forEach(sw => {
         const triggerSwitch = () => {
+            // Attempt to resume audio context on interaction
             if (!isAudioResumed && isAudioInitialized) ensureAudioContextResumed();
             const currentState = sw.dataset.state;
             const newState = currentState === 'up' ? 'down' : 'up';
@@ -1264,6 +1268,7 @@
         };
         sw.addEventListener('click', triggerSwitch);
         sw.addEventListener('keydown', (e) => {
+            // Allow toggling with Enter or Space when focused
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 triggerSwitch();
@@ -1272,18 +1277,20 @@
     });
 
     // -- General Interaction Listener for Audio Context --
+    // Ensures audio context can start on first click anywhere on the panel
     synthPanel.addEventListener('click', () => {
         if (!isAudioResumed && isAudioInitialized) ensureAudioContextResumed();
-    }, { capture: true });
+    }, { capture: true }); // Use capture to catch clicks on child elements too
 
     // --- INITIAL SETUP ---
     document.addEventListener('DOMContentLoaded', () => {
-        // Initialize UI elements first (visuals only)
-        updateAllKnobs(false);
-        updateAllSwitches(false);
-
-        // Initialize audio graph and parameters
+        // Initialize audio graph and parameters first
         initAudio();
+
+        // Set initial UI state based on parameters (needs audio nodes to exist)
+        // 'true' flag ensures AudioNodes are updated even if context is suspended initially
+        updateAllKnobs(true);
+        updateAllSwitches(true);
 
         console.log("Mono Synth Ready. Click panel or press keys (A, W, S, E, D, F, T, G, Y, H, U, J, K) to start audio and play.");
         if (isAudioInitialized && audioContext?.state === 'suspended') {
