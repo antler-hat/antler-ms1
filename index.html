@@ -27,20 +27,18 @@
 
         .synth-panel {
             background-color: #000000;
-            border: 2px solid #555;
             padding: 20px;
             display: grid;
             /* 4 Column Grid Layout */
             grid-template-columns: repeat(4, auto);
             gap: 20px 15px;
-            box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, .8);
              min-width: 800px; /* Minimum width for the panel */
              width: max-content; /* Adjust width based on content */
              cursor: default;
         }
 
         .module {
-            border: 1px solid #444;
             padding: 15px 10px;
             text-align: center;
             display: flex;
@@ -52,12 +50,11 @@
         }
 
         .module-title {
-            font-weight: bold;
+            letter-spacing: .2em;
             margin-bottom: 10px;
             font-size: 0.9em;
             color: #ccc;
             width: 100%;
-            border-bottom: 1px solid #444;
             padding-bottom: 5px;
             text-align: center;
         }
@@ -175,10 +172,6 @@
             gap: 15px; /* Adjust gap as needed */
             align-items: center; /* Center align items */
             justify-content: start; /* Align content to the top */
-        }
-        #vcf-module .module-title, #vca-module .module-title {
-            /* Title spans full width implicitly */
-            margin-bottom: 5px;
         }
          .adsr-group {
              display: grid;
@@ -337,11 +330,11 @@
         <div class="adsr-group">
             <div class="control-group">
                 <label for="vcf-attack">Attack</label>
-                <div class="knob" id="vcf-attack" data-param="vcfEnv.attack" data-min="0.005" data-max="2" data-value="0.01" data-curve="log" tabindex="0"></div>
+                <div class="knob" id="vcf-attack" data-param="vcfEnv.attack" data-min="0.005" data-max="2" data-value="0.01" tabindex="0"></div>
             </div>
             <div class="control-group">
                 <label for="vcf-decay">Decay</label>
-                <div class="knob" id="vcf-decay" data-param="vcfEnv.decay" data-min="0.005" data-max="2" data-value="0.1" data-curve="log" tabindex="0"></div>
+                <div class="knob" id="vcf-decay" data-param="vcfEnv.decay" data-min="0.005" data-max="2" data-value="0.1" tabindex="0"></div>
             </div>
             <div class="control-group">
                 <label for="vcf-sustain">Sustain</label>
@@ -349,7 +342,7 @@
             </div>
             <div class="control-group">
                 <label for="vcf-release">Release</label>
-                <div class="knob" id="vcf-release" data-param="vcfEnv.release" data-min="0.005" data-max="5" data-value="0.2" data-curve="log" tabindex="0"></div>
+                <div class="knob" id="vcf-release" data-param="vcfEnv.release" data-min="0.005" data-max="5" data-value="0.2" tabindex="0"></div>
             </div>
         </div>
          <div id="vcf-mod-controls">
@@ -370,11 +363,11 @@
          <div class="adsr-group">
             <div class="control-group">
                 <label for="vca-attack">Attack</label>
-                <div class="knob" id="vca-attack" data-param="vcaEnv.attack" data-min="0.005" data-max="2" data-value="0.01" data-curve="log" tabindex="0"></div>
+                <div class="knob" id="vca-attack" data-param="vcaEnv.attack" data-min="0.005" data-max="2" data-value="0.01" tabindex="0"></div>
             </div>
             <div class="control-group">
                 <label for="vca-decay">Decay</label>
-                <div class="knob" id="vca-decay" data-param="vcaEnv.decay" data-min="0.005" data-max="2" data-value="0.1" data-curve="log" tabindex="0"></div>
+                <div class="knob" id="vca-decay" data-param="vcaEnv.decay" data-min="0.005" data-max="2" data-value="0.1" tabindex="0"></div>
             </div>
             <div class="control-group">
                 <label for="vca-sustain">Sustain</label>
@@ -382,7 +375,7 @@
             </div>
             <div class="control-group">
                 <label for="vca-release">Release</label>
-                <div class="knob" id="vca-release" data-param="vcaEnv.release" data-min="0.005" data-max="5" data-value="0.2" data-curve="log" tabindex="0"></div>
+                <div class="knob" id="vca-release" data-param="vcaEnv.release" data-min="0.005" data-max="5" data-value="0.2" tabindex="0"></div>
             </div>
         </div>
          <div id="vca-mod-controls">
