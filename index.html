@@ -310,7 +310,7 @@
         <div id="vcf-filter-controls"> <!-- Horizontal layout -->
             <div class="control-group">
                 <label for="vcf-cutoff">Cutoff</label>
-                <div class="knob" id="vcf-cutoff" data-param="filter.frequency.value" data-min="20" data-max="20000" data-value="20000" tabindex="0"></div>
+                <div class="knob" id="vcf-cutoff" data-param="filter.frequency.value" data-min="20" data-max="20000" data-value="20000" data-curve="log" tabindex="0"></div>
             </div>
              <div class="control-group">
                 <label for="vcf-res">Res</label>
@@ -327,19 +327,19 @@
         <div class="adsr-group">
             <div class="control-group">
                 <label for="vcf-attack">Attack</label>
-                <div class="knob" id="vcf-attack" data-param="vcfEnv.attack" data-min="0.005" data-max="2" data-value="0.01" tabindex="0"></div>
+                <div class="knob" id="vcf-attack" data-param="vcfEnv.attack" data-min="0.005" data-max="2" data-value="0.005" tabindex="0"></div>
             </div>
             <div class="control-group">
                 <label for="vcf-decay">Decay</label>
-                <div class="knob" id="vcf-decay" data-param="vcfEnv.decay" data-min="0.005" data-max="2" data-value="0.1" tabindex="0"></div>
+                <div class="knob" id="vcf-decay" data-param="vcfEnv.decay" data-min="0.005" data-max="2" data-value="2" tabindex="0"></div>
             </div>
             <div class="control-group">
                 <label for="vcf-sustain">Sustain</label>
-                <div class="knob" id="vcf-sustain" data-param="vcfEnv.sustain" data-min="0" data-max="1" data-value="0.8" tabindex="0"></div>
+                <div class="knob" id="vcf-sustain" data-param="vcfEnv.sustain" data-min="0" data-max="1" data-value="1" tabindex="0"></div>
             </div>
             <div class="control-group">
                 <label for="vcf-release">Release</label>
-                <div class="knob" id="vcf-release" data-param="vcfEnv.release" data-min="0.005" data-max="5" data-value="0.2" tabindex="0"></div>
+                <div class="knob" id="vcf-release" data-param="vcfEnv.release" data-min="0.005" data-max="5" data-value="0.005" tabindex="0"></div>
             </div>
         </div>
          <div id="vcf-mod-controls">
@@ -349,7 +349,7 @@
             </div>
             <div class="control-group">
                 <label for="vcf-adsr-level">ADSR</label>
-                <div class="knob" id="vcf-adsr-level" data-param="vcfEnvGain.gain.value" data-min="0" data-max="8000" data-value="4000" tabindex="0"></div> <!-- Env Mod depth in Hz -->
+                <div class="knob" id="vcf-adsr-level" data-param="vcfEnvGain.gain.value" data-min="0" data-max="8000" data-value="0" tabindex="0"></div> <!-- Env Mod depth in Hz -->
             </div>
         </div>
     </div>
@@ -556,57 +556,88 @@
             console.error("Attempted to resume context, but it's not initialized.");
             return false;
         }
-        if (audioContext.state === 'running') {
-            if (!isAudioResumed) isAudioResumed = true;
-            return true;
-        }
-        if (audioContext.state === 'suspended') {
-            console.log("AudioContext suspended. Attempting to resume...");
-            try {
+
+        try {
+            if (audioContext.state === 'running') {
+                if (!isAudioResumed) isAudioResumed = true;
+                return true;
+            }
+
+            if (audioContext.state === 'suspended') {
+                console.log("AudioContext suspended. Attempting to resume...");
                 await audioContext.resume();
+
+                // Double check the state after resume
                 if (audioContext.state === 'running') {
                     console.log("AudioContext Resumed successfully.");
                     isAudioResumed = true;
                     return true;
-                } else {
-                    console.warn("AudioContext state is still not 'running' after resume attempt:", audioContext.state);
-                    isAudioResumed = false;
-                    return false;
                 }
-            } catch (e) {
-                console.error("Error resuming AudioContext:", e);
+
+                // If we get here, resume didn't work as expected
+                console.warn("AudioContext state is still not 'running' after resume attempt:", audioContext.state);
                 isAudioResumed = false;
                 return false;
             }
+
+            // Handle closed or other states
+            if (audioContext.state === 'closed') {
+                console.error("AudioContext is closed. Reinitializing...");
+                isAudioInitialized = false;
+                isAudioResumed = false;
+                initAudio();
+                return false;
+            }
+
+            console.warn("AudioContext in unexpected state:", audioContext.state);
+            isAudioResumed = false;
+            return false;
+
+        } catch (e) {
+            console.error("Error resuming AudioContext:", e);
+            isAudioResumed = false;
+            return false;
         }
-        console.warn("AudioContext in unexpected state:", audioContext.state);
-        isAudioResumed = false;
-        return false;
     }
 
     function initAudio() {
         if (isAudioInitialized) return;
         console.log("Initializing AudioContext...");
         try {
+            // Create audio context with better error handling
+            if (!window.AudioContext && !window.webkitAudioContext) {
+                throw new Error("Web Audio API is not supported in this browser");
+            }
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+            // Check if context was created successfully
+            if (!audioContext) {
+                throw new Error("Failed to create AudioContext");
+            }
+
             isAudioInitialized = true;
             console.log("Initial AudioContext State:", audioContext.state);
 
             // --- Create Core Synth Nodes ---
-            masterGain = audioContext.createGain(); params.masterGain.node = masterGain;
-            vco1 = audioContext.createOscillator(); params.vco1.node = vco1;
-            vco2 = audioContext.createOscillator(); params.vco2.node = vco2;
-            vco1Gain = audioContext.createGain(); params.vco1Gain.node = vco1Gain;
-            vco2Gain = audioContext.createGain(); params.vco2Gain.node = vco2Gain;
-            noiseGain = audioContext.createGain(); params.noiseGain.node = noiseGain;
-            filter = audioContext.createBiquadFilter(); params.filter.node = filter;
-            vcaGainNode = audioContext.createGain(); vcaGainNode.gain.value = 0; // Start silent
-            lfo = audioContext.createOscillator(); params.lfo.node = lfo;
-            vco1LfoGain = audioContext.createGain(); params.vco1LfoGain.node = vco1LfoGain;
-            vco2LfoGain = audioContext.createGain(); params.vco2LfoGain.node = vco2LfoGain;
-            vcfLfoGain = audioContext.createGain(); params.vcfLfoGain.node = vcfLfoGain;
-            vcaLfoGain = audioContext.createGain(); params.vcaLfoGain.node = vcaLfoGain;
-            vcfEnvGain = audioContext.createGain(); params.vcfEnvGain.node = vcfEnvGain;
+            try {
+                masterGain = audioContext.createGain(); params.masterGain.node = masterGain;
+                vco1 = audioContext.createOscillator(); params.vco1.node = vco1;
+                vco2 = audioContext.createOscillator(); params.vco2.node = vco2;
+                vco1Gain = audioContext.createGain(); params.vco1Gain.node = vco1Gain;
+                vco2Gain = audioContext.createGain(); params.vco2Gain.node = vco2Gain;
+                noiseGain = audioContext.createGain(); params.noiseGain.node = noiseGain;
+                filter = audioContext.createBiquadFilter(); params.filter.node = filter;
+                vcaGainNode = audioContext.createGain(); vcaGainNode.gain.value = 0; // Start silent
+                lfo = audioContext.createOscillator(); params.lfo.node = lfo;
+                vco1LfoGain = audioContext.createGain(); params.vco1LfoGain.node = vco1LfoGain;
+                vco2LfoGain = audioContext.createGain(); params.vco2LfoGain.node = vco2LfoGain;
+                vcfLfoGain = audioContext.createGain(); params.vcfLfoGain.node = vcfLfoGain;
+                vcaLfoGain = audioContext.createGain(); params.vcaLfoGain.node = vcaLfoGain;
+                vcfEnvGain = audioContext.createGain(); params.vcfEnvGain.node = vcfEnvGain;
+
+            } catch (e) {
+                throw new Error("Failed to create audio nodes: " + e.message);
+            }
 
             // --- Create Noise Source ---
             const bufferSize = audioContext.sampleRate * 2;
@@ -629,46 +660,9 @@
             reverbDryGain = audioContext.createGain(); params.reverbDryGain.node = reverbDryGain;
 
 
-            // --- Set Initial Parameters for Core Synth ---
-            Object.keys(params).forEach(key => {
-                const param = params[key];
-                if (param && param.node && typeof param.value !== 'undefined') {
-                     if(param.node.gain) param.node.gain.value = param.value;
-                     else if (param.node.frequency) param.node.frequency.value = param.value;
-                     // Handle other types if needed
-                } else if (param && param.node && param.gain && typeof param.gain.value !== 'undefined') {
-                     param.node.gain.value = param.gain.value;
-                } else if (param && param.node && param.frequency && typeof param.frequency.value !== 'undefined') {
-                     param.node.frequency.value = param.frequency.value;
-                } else if (param && param.node && param.detune && typeof param.detune.value !== 'undefined') {
-                    param.node.detune.value = param.detune.value; // Initial detune for VCO2
-                } else if (key === 'filter' && param.node) {
-                    param.node.type = param.type;
-                    param.node.frequency.value = param.frequency.value;
-                    param.node.Q.value = param.Q.value;
-                } else if (key === 'vco1' || key === 'vco2') {
-                     if(param.node) param.node.type = param.type;
-                } else if (key === 'lfo' && param.node) {
-                    param.node.type = param.type;
-                    param.node.frequency.value = param.frequency.value;
-                }
-            });
-            // Specific initializations not covered by loop
-            vco1.type = params.vco1.type;
-            vco2.type = params.vco2.type;
-            vco1.detune.value = params.masterTune; // Apply master tune
-            vco2.detune.value = params.masterTune + params.vco2.detune.value; // Apply master tune + detune
-
-            // --- Set Initial Parameters for FX ---
-            distortion.curve = makeDistortionCurve(params.distortionAmount);
-            distortion.oversample = '4x'; // Improves quality
-            delay.delayTime.value = params.delayTime.delayTime.value;
-            delayFeedbackGain.gain.value = params.delayFeedbackGain.gain.value;
-            delayWetGain.gain.value = params.delayLevel; // Controlled by delayLevel
-            delayDryGain.gain.value = 1 - params.delayLevel;
-            reverbWetGain.gain.value = params.reverbLevel; // Controlled by reverbLevel
-            reverbDryGain.gain.value = 1 - params.reverbLevel;
-
+            // --- Set Initial Parameters for Core Synth (using updateAllKnobs/Switches later) ---
+            // No need to manually loop through params here anymore,
+            // updateAllKnobs(true) will handle setting initial values via updateParameter
 
             // --- Create Reverb Impulse ---
             const reverbTime = 1.5, decay = 2.0, sampleRate = audioContext.sampleRate;
@@ -694,7 +688,7 @@
             vcaLfoGain.connect(vcaGainNode.gain); // LFO modulates VCA gain directly
 
             // VCF Envelope -> Filter Freq
-            vcfEnvGain.connect(filter.frequency);
+            vcfEnvGain.connect(filter.frequency); // Amount is controlled by vcfEnvGain.gain
 
             // Oscillators & Noise -> Mixer -> Filter
             vco1.connect(vco1Gain);
@@ -756,13 +750,18 @@
                 isAudioResumed = false;
                 console.log("Audio graph initialized, but context is suspended. Requires user interaction.");
             }
-            updateAllKnobs(true); // Initialize UI based on params
-            updateAllSwitches(true);
+
+            // !!! CRITICAL: Initialize UI and set initial audio node values HERE !!!
+            updateAllKnobs(true); // Initialize UI based on params, force audio node updates
+            updateAllSwitches(true); // Initialize switches, force audio node updates
 
         } catch (e) {
             console.error("Error initializing Web Audio API:", e);
-            alert("Web Audio API initialization failed. Your browser might not support it or an error occurred.");
             isAudioInitialized = false;
+            // Show a more informative error message
+            const errorMsg = "Web Audio API initialization failed: " + e.message +
+                            "\nPlease ensure you're using a modern browser and try refreshing the page.";
+            alert(errorMsg);
         }
     }
 
@@ -778,7 +777,8 @@
 
         if (isVcf) {
             // VCF Envelope controls frequency
-            const knobBaseFreq = params.filter.frequency.value; // Current cutoff knob value
+            // Read the *current* base frequency directly from the param object (set by the knob)
+            const knobBaseFreq = params.filter.frequency.value;
             const envModAmount = params.vcfEnvGain.gain.value; // How much env affects cutoff
             const baseFreqWithKeyFollow = Math.max(20, knobBaseFreq); // Use knob value directly (min 20Hz)
             const attackPeakFreq = baseFreqWithKeyFollow + envModAmount;
@@ -791,7 +791,8 @@
             const clampedSustainFreq = Math.min(nyquist, Math.max(20, sustainLevelFreq));
 
             // Schedule envelope ramps
-            targetParam.setValueAtTime(clampedBaseFreq, now); // Start at base freq
+            // Set initial value to base frequency (important!)
+            targetParam.setValueAtTime(clampedBaseFreq, now);
             targetParam.linearRampToValueAtTime(clampedPeakFreq, now + safeAttack); // Ramp up during attack
             targetParam.linearRampToValueAtTime(clampedSustainFreq, now + safeAttack + safeDecay); // Ramp down to sustain
 
@@ -815,7 +816,7 @@
         let actualReleaseTime = safeRelease; // Base release time from knob
 
         if (isVcf) {
-            // VCF release targets the base cutoff frequency from the knob
+            // VCF release targets the base cutoff frequency from the knob (param object)
             const knobBaseFreq = params.filter.frequency.value;
             const baseFreqWithKeyFollow = Math.max(20, knobBaseFreq);
             releaseTargetValue = Math.min(audioContext.sampleRate / 2, Math.max(20, baseFreqWithKeyFollow));
@@ -953,43 +954,34 @@
 
 
     // ----- UI UPDATE FUNCTIONS -----
-    function updateKnobVisual(knob, value) {
-        const min = parseFloat(knob.dataset.min);
-        const max = parseFloat(knob.dataset.max);
+
+    // MODIFIED: Takes valueForRotation which is ALWAYS the linear percentage (0-1)
+    // Also takes actualAudioValue for storage/display purposes.
+    function updateKnobVisual(knob, valueForRotation, actualAudioValue) {
+        // Store the actual audio value back to the dataset for reference/debugging
+        // Note: data-value itself will hold the audio value for log knobs now,
+        // but this is good for consistency/debugging.
+        knob.dataset.actualValue = typeof actualAudioValue === 'number' ?
+            actualAudioValue.toFixed(5) :
+            actualAudioValue;
+
         const steps = knob.dataset.steps ? knob.dataset.steps.split(',') : null;
-        let percentage;
-        const numericValue = parseFloat(value);
 
-        // Store the current value (index for stepped, float for linear) back to the dataset
-        knob.dataset.value = steps ? Math.round(numericValue).toString() : numericValue.toFixed(5);
+        // valueForRotation IS the percentage (0-1)
+        let percentage = Math.max(0, Math.min(1, valueForRotation));
 
+        // Update step-based labels if applicable (using percentage to find index)
         if (steps) {
-            // Calculate percentage based on step index for stepped knobs
-            const stepIndex = Math.max(0, Math.min(steps.length - 1, Math.round(numericValue)));
-            percentage = steps.length > 1 ? stepIndex / (steps.length - 1) : 0.5; // Avoid division by zero if only one step
-
-            // Update associated labels for specific stepped knobs
+            const stepIndex = Math.round(percentage * (steps.length - 1));
             if (knob.id === 'vco1-waveshape') document.getElementById('vco1-shape-indicator').textContent = vcoShapeIndicators[stepIndex] || '?';
             if (knob.id === 'vco2-waveshape') document.getElementById('vco2-shape-indicator').textContent = vcoShapeIndicators[stepIndex] || '?';
             if (knob.id === 'lfo-waveshape') document.getElementById('lfo-shape-indicator').textContent = lfoShapeIndicators[stepIndex] || '?';
             if (knob.id === 'vco1-octave') document.getElementById('vco1-octave-indicator').textContent = octaveSteps[stepIndex] ? octaveSteps[stepIndex] + "'" : '?';
             if (knob.id === 'vco2-octave') document.getElementById('vco2-octave-indicator').textContent = octaveSteps[stepIndex] ? octaveSteps[stepIndex] + "'" : '?';
-
-        } else {
-            // Calculate percentage based on value range for linear knobs
-            const range = max - min;
-            // Apply logarithmic scaling if data-curve="log" is present
-            if (knob.dataset.curve === 'log' && numericValue > 0 && min > 0) {
-                 percentage = (Math.log(numericValue / min)) / (Math.log(max / min));
-            } else {
-                // Linear scaling
-                percentage = range !== 0 ? (numericValue - min) / range : 0.5; // Handle range of 0
-            }
         }
 
-        // Clamp percentage and calculate rotation
-        percentage = Math.max(0, Math.min(1, percentage)); // Clamp between 0 and 1
-        const rotation = -135 + (percentage * 270); // Map 0-1 to -135deg to +135deg
+        // Calculate rotation based on the linear percentage
+        const rotation = -135 + (percentage * 270); // Map 0-1 linearly to -135deg to +135deg
         knob.style.transform = `rotate(${rotation}deg)`;
     }
 
@@ -1005,151 +997,158 @@
         if (sw.dataset.values) { // If values are defined (e.g., "highpass,lowpass")
             const values = sw.dataset.values.split(',');
             const text = state === 'up' ? values[0] : values[1]; // 'up' maps to first value
-            labelElement.textContent = text.substring(0,2).toUpperCase(); // Display first 3 chars (e.g., HIG, LOW)
+            // Display first 2 chars (e.g., HI, LO) - Adjusted from 3
+            labelElement.textContent = text.substring(0,2).toUpperCase();
         } else { // Default label update if no specific values
             labelElement.textContent = state === 'up' ? 'UP' : 'DOWN';
         }
     }
 
     // Main function to update synth parameter based on UI interaction
+    // MODIFIED: For log knobs, newValue IS the target audio value.
+    //           Percentage is calculated internally for visual updates.
     function updateParameter(knobOrSwitch, newValue, forceUpdate = false) {
         const element = knobOrSwitch;
-        const paramPath = element.dataset.param; // e.g., "filter.frequency.value" or "vco1.octave"
+        const paramPath = element.dataset.param;
         const isKnob = element.classList.contains('knob');
         const isSwitch = element.classList.contains('switch');
 
-        let targetValue = newValue; // The value representing the UI state (index or float)
-        let actualAudioValue;       // The value used by the AudioNode API (string, float)
+        let uiValue = newValue; // The value representing the UI state (value, index, 'up'/'down')
+        let actualAudioValue; // The value used by the AudioNode API or stored in params
+        let percentageForVisual = 0.5; // Default percentage for visual update
 
-        // --- Determine Target Value and Actual Audio Value based on control type ---
         if (isKnob) {
             const min = parseFloat(element.dataset.min);
             const max = parseFloat(element.dataset.max);
             const steps = element.dataset.steps ? element.dataset.steps.split(',') : null;
-            const numericNewValue = parseFloat(newValue);
+            const isLog = element.dataset.curve === 'log' && min > 0;
+            const numericNewValue = parseFloat(newValue); // Should be audio value or index
 
-            if (steps) { // Stepped Knob (Waveforms, Octaves)
+            if (steps) { // Stepped Knob (Waveforms, Octaves) - No change needed here
                 const stepIndex = Math.max(0, Math.min(steps.length - 1, Math.round(numericNewValue)));
-                targetValue = stepIndex; // UI value is the index
+                uiValue = stepIndex; // UI value is the index
                 const stepValueStr = steps[stepIndex];
-                // Audio value is the string ('sawtooth') or parsed number from steps array
                 actualAudioValue = isNaN(parseFloat(stepValueStr)) ? stepValueStr : parseFloat(stepValueStr);
-                 // Special case: Octave parameter stores the index internally, used later for calculation
-                 if (paramPath.endsWith('.octave')) {
-                     actualAudioValue = targetValue; // Store the index itself
-                 }
-            } else { // Linear/Logarithmic Knob
-                 // Apply logarithmic scaling if specified
-                 if (element.dataset.curve === 'log' && min > 0) {
-                    // Map linear 0-1 range back to log scale - THIS IS HANDLED VISUALLY ONLY
-                    // The newValue is already the desired *audio* value
-                    targetValue = Math.max(min, Math.min(max, numericNewValue));
-                 } else {
-                     targetValue = Math.max(min, Math.min(max, numericNewValue)); // Clamp linear value
-                 }
-                 actualAudioValue = targetValue; // Audio value is the clamped float value
+                if (paramPath.endsWith('.octave')) actualAudioValue = uiValue; // Store index for octave
+                element.dataset.value = uiValue; // Store index in dataset
+                // Calculate percentage for visual
+                percentageForVisual = steps.length > 1 ? stepIndex / (steps.length - 1) : 0.5;
+            } else if (isLog) { // Logarithmic Knob - *** MAJOR CHANGE HERE ***
+                // newValue (uiValue) IS the target audio value
+                uiValue = Math.max(min, Math.min(max, numericNewValue)); // Clamp audio value
+                actualAudioValue = uiValue;
+                element.dataset.value = uiValue; // Store actual audio value in dataset
+
+                // Calculate the linear percentage (0-1) JUST for the visual update
+                if (uiValue <= min) {
+                    percentageForVisual = 0;
+                } else if (uiValue >= max) {
+                     percentageForVisual = 1;
+                } else {
+                    // Inverse calculation: value to percentage
+                    percentageForVisual = Math.log(uiValue / min) / Math.log(max / min);
+                }
+                percentageForVisual = Math.max(0, Math.min(1, percentageForVisual)); // Clamp 0-1
+
+            } else { // Linear Knob - No change needed here
+                uiValue = Math.max(min, Math.min(max, numericNewValue)); // Clamp linear value
+                actualAudioValue = uiValue;
+                element.dataset.value = uiValue; // Store linear value in dataset
+                // Calculate percentage for visual
+                const range = max - min;
+                percentageForVisual = range !== 0 ? (actualAudioValue - min) / range : 0.5;
             }
-            updateKnobVisual(element, targetValue); // Update visual rotation/label
+            // Pass the calculated percentage for rotation, and the audio value for reference
+            updateKnobVisual(element, percentageForVisual, actualAudioValue);
 
-        } else if (isSwitch) { // Switch (Filter Type)
+        } else if (isSwitch) { // Switch - No change needed here
             const state = newValue; // 'up' or 'down'
-            element.dataset.state = state; // Store the state ('up'/'down')
-
-            if (element.dataset.values) { // If values like "highpass,lowpass" are present
+            element.dataset.state = state;
+            if (element.dataset.values) {
                 const values = element.dataset.values.split(',');
-                actualAudioValue = state === 'up' ? values[0] : values[1]; // 'up' maps to first value
-            } else { // Generic switch defaults to 1/0
+                actualAudioValue = state === 'up' ? values[0] : values[1];
+            } else {
                 actualAudioValue = state === 'up' ? 1 : 0;
             }
             updateSwitchVisual(element); // Update visual state and label
-            targetValue = actualAudioValue; // For switches, UI value often matches audio value
-            element.dataset.value = targetValue; // Store the *derived* value (e.g., 'lowpass') back
+            uiValue = actualAudioValue; // For switches, UI value often matches audio value string
+            element.dataset.value = uiValue; // Store the derived value
         }
 
-        // --- Update Internal Params Object ---
-        // This allows tracking the synth's state separate from the AudioNodes
+        // --- Update Internal Params Object --- (Logic remains the same, uses actualAudioValue)
         const parts = paramPath.split('.');
         let currentParamObj = params;
         try {
-            // Traverse the params object path (e.g., params.filter.frequency)
             for (let i = 0; i < parts.length - 1; i++) {
-                if (!currentParamObj[parts[i]]) currentParamObj[parts[i]] = {}; // Create nested object if needed
+                if (!currentParamObj[parts[i]]) currentParamObj[parts[i]] = {};
                 currentParamObj = currentParamObj[parts[i]];
             }
-            const finalKey = parts[parts.length - 1]; // The final property name (e.g., 'value', 'type', 'octave')
+            const finalKey = parts[parts.length - 1];
 
-            // Special case: Store octave index directly
-            if (finalKey === 'octave' && isKnob) {
-                currentParamObj[finalKey] = targetValue; // Store the index (0-4)
-            }
-            // Check if the target is an AudioParam-like object { value: x }
-            else if (typeof currentParamObj[finalKey] === 'object' && currentParamObj[finalKey] !== null && 'value' in currentParamObj[finalKey] && typeof actualAudioValue === 'number') {
-                currentParamObj[finalKey].value = actualAudioValue; // Update the nested 'value'
-            } else { // Otherwise, update the property directly
+             if (finalKey === 'octave' && isKnob) {
+                 currentParamObj[finalKey] = actualAudioValue; // Store the index
+            } else if (typeof currentParamObj[finalKey] === 'object' && currentParamObj[finalKey] !== null && 'value' in currentParamObj[finalKey] && typeof actualAudioValue === 'number') {
+                 currentParamObj[finalKey].value = actualAudioValue;
+            } else if (typeof currentParamObj[finalKey] === 'object' && currentParamObj[finalKey] !== null && finalKey === 'detune' && 'value' in currentParamObj[finalKey] && typeof actualAudioValue === 'number') {
+                 // Special case for VCO2 detune nested object
+                 currentParamObj[finalKey].value = actualAudioValue;
+            } else {
                 currentParamObj[finalKey] = actualAudioValue;
             }
-
         } catch (e) { console.warn("Error updating internal params:", paramPath, e); }
 
-        // --- Update Web Audio Node ---
-        // Only update if audio is initialized and context is running (or forced on init)
+        // --- Update Web Audio Node --- (Logic remains the same, uses actualAudioValue)
         if (isAudioInitialized && (isAudioResumed || forceUpdate) && audioContext) {
             const now = audioContext.currentTime;
-            const rampTime = 0.010; // Short ramp (10ms) for smooth transitions on gain/freq
+            // Use a slightly shorter ramp time for controls that need responsiveness (like filter cutoff)
+            const fastRampTime = 0.005;
+            const defaultRampTime = 0.010;
 
             try {
-                const valueToSet = actualAudioValue; // Use the value determined for the API
+                 const valueToSet = actualAudioValue; // Use the final calculated audio value
 
-                // Selectively update the corresponding AudioNode parameter
-                // Use setTargetAtTime for smooth ramps on continuous parameters (gain, freq, detune)
-                // Set value directly for discrete parameters (type)
-
-                if (paramPath === 'masterGain.gain.value' && masterGain) masterGain.gain.setTargetAtTime(valueToSet, now, rampTime);
-                else if (paramPath === 'vco1Gain.gain.value' && vco1Gain) vco1Gain.gain.setTargetAtTime(valueToSet, now, rampTime);
-                else if (paramPath === 'vco2Gain.gain.value' && vco2Gain) vco2Gain.gain.setTargetAtTime(valueToSet, now, rampTime);
-                else if (paramPath === 'noiseGain.gain.value' && noiseGain) noiseGain.gain.setTargetAtTime(valueToSet, now, rampTime);
-                else if (paramPath === 'vco1LfoGain.gain.value' && vco1LfoGain) vco1LfoGain.gain.setTargetAtTime(valueToSet, now, rampTime);
-                else if (paramPath === 'vco2LfoGain.gain.value' && vco2LfoGain) vco2LfoGain.gain.setTargetAtTime(valueToSet, now, rampTime);
-                else if (paramPath === 'vcfLfoGain.gain.value' && vcfLfoGain) vcfLfoGain.gain.setTargetAtTime(valueToSet, now, rampTime);
-                else if (paramPath === 'vcaLfoGain.gain.value' && vcaLfoGain) vcaLfoGain.gain.setTargetAtTime(valueToSet, now, rampTime);
-                else if (paramPath === 'vcfEnvGain.gain.value' && vcfEnvGain) vcfEnvGain.gain.setTargetAtTime(valueToSet, now, rampTime);
-                else if (paramPath === 'filter.frequency.value' && filter) filter.frequency.setTargetAtTime(valueToSet, now, rampTime);
-                else if (paramPath === 'filter.Q.value' && filter) filter.Q.setTargetAtTime(valueToSet, now, rampTime);
-                else if (paramPath === 'filter.type' && filter) filter.type = valueToSet; // Set type directly
-                else if (paramPath === 'lfo.frequency.value' && lfo) lfo.frequency.setTargetAtTime(valueToSet, now, rampTime);
-                else if (paramPath === 'lfo.type' && lfo) lfo.type = valueToSet; // Set type directly
-                else if (paramPath === 'vco1.type' && vco1) vco1.type = valueToSet; // Set type directly
-                else if (paramPath === 'vco2.type' && vco2) vco2.type = valueToSet; // Set type directly
-
-                // FX Parameter Updates
-                else if (paramPath === 'distortionAmount' && distortion) distortion.curve = makeDistortionCurve(valueToSet);
-                else if (paramPath === 'delayTime.delayTime.value' && delay) delay.delayTime.setTargetAtTime(valueToSet, now, rampTime);
-                else if (paramPath === 'delayFeedbackGain.gain.value' && delayFeedbackGain) delayFeedbackGain.gain.setTargetAtTime(valueToSet, now, rampTime);
-                else if (paramPath === 'delayLevel') { // Delay Wet/Dry Mix
-                    if (delayWetGain) delayWetGain.gain.setTargetAtTime(valueToSet, now, rampTime);
-                    if (delayDryGain) delayDryGain.gain.setTargetAtTime(1 - valueToSet, now, rampTime);
-                }
-                else if (paramPath === 'reverbLevel') { // Reverb Wet/Dry Mix
-                    if (reverbWetGain) reverbWetGain.gain.setTargetAtTime(valueToSet, now, rampTime);
-                    if (reverbDryGain) reverbDryGain.gain.setTargetAtTime(1 - valueToSet, now, rampTime);
-                }
-
-
-                // Special handling for parameters affecting VCO pitch if a note is playing
-                else if ((paramPath === 'vco1.octave' || paramPath === 'vco2.octave') && currentNote !== null) {
-                    // Recalculate and set frequency, using the *stored index* from params object
-                    const targetOsc1Freq = calculateVcoFrequency(currentFrequency, params.vco1);
-                    const targetOsc2Freq = calculateVcoFrequency(currentFrequency, params.vco2);
-                     if (vco1) vco1.frequency.setTargetAtTime(targetOsc1Freq, now, rampTime * 2); // Longer ramp for pitch changes
-                     if (vco2) vco2.frequency.setTargetAtTime(targetOsc2Freq, now, rampTime * 2);
-                }
-                else if ((paramPath === 'masterTune' || paramPath === 'vco2.detune.value')) {
-                    // Update detune values based on master tune and VCO2 detune param
-                    if (vco1) vco1.detune.setTargetAtTime(params.masterTune, now, rampTime);
-                    if (vco2) vco2.detune.setTargetAtTime(params.masterTune + params.vco2.detune.value, now, rampTime);
-                }
-                // Envelope parameters (attack, decay, etc.) are read during noteOn/noteOff,
-                // no direct AudioNode update needed here. Portamento time is also used internally.
+                 // Use appropriate ramp times
+                 if (paramPath === 'masterGain.gain.value' && masterGain) masterGain.gain.setTargetAtTime(valueToSet, now, defaultRampTime);
+                 else if (paramPath === 'vco1Gain.gain.value' && vco1Gain) vco1Gain.gain.setTargetAtTime(valueToSet, now, defaultRampTime);
+                 else if (paramPath === 'vco2Gain.gain.value' && vco2Gain) vco2Gain.gain.setTargetAtTime(valueToSet, now, defaultRampTime);
+                 else if (paramPath === 'noiseGain.gain.value' && noiseGain) noiseGain.gain.setTargetAtTime(valueToSet, now, defaultRampTime);
+                 else if (paramPath === 'vco1LfoGain.gain.value' && vco1LfoGain) vco1LfoGain.gain.setTargetAtTime(valueToSet, now, defaultRampTime);
+                 else if (paramPath === 'vco2LfoGain.gain.value' && vco2LfoGain) vco2LfoGain.gain.setTargetAtTime(valueToSet, now, defaultRampTime);
+                 else if (paramPath === 'vcfLfoGain.gain.value' && vcfLfoGain) vcfLfoGain.gain.setTargetAtTime(valueToSet, now, defaultRampTime);
+                 else if (paramPath === 'vcaLfoGain.gain.value' && vcaLfoGain) vcaLfoGain.gain.setTargetAtTime(valueToSet, now, defaultRampTime);
+                 else if (paramPath === 'vcfEnvGain.gain.value' && vcfEnvGain) vcfEnvGain.gain.setTargetAtTime(valueToSet, now, defaultRampTime);
+                 else if (paramPath === 'filter.frequency.value' && filter) filter.frequency.setTargetAtTime(valueToSet, now, fastRampTime); // Use faster ramp for cutoff
+                 else if (paramPath === 'filter.Q.value' && filter) filter.Q.setTargetAtTime(valueToSet, now, defaultRampTime);
+                 else if (paramPath === 'filter.type' && filter) filter.type = valueToSet; // No ramp for type change
+                 else if (paramPath === 'lfo.frequency.value' && lfo) lfo.frequency.setTargetAtTime(valueToSet, now, defaultRampTime);
+                 else if (paramPath === 'lfo.type' && lfo) lfo.type = valueToSet; // No ramp
+                 else if (paramPath === 'vco1.type' && vco1) vco1.type = valueToSet; // No ramp
+                 else if (paramPath === 'vco2.type' && vco2) vco2.type = valueToSet; // No ramp
+                 else if (paramPath === 'distortionAmount' && distortion) distortion.curve = makeDistortionCurve(valueToSet); // No ramp
+                 else if (paramPath === 'delayTime.delayTime.value' && delay) delay.delayTime.setTargetAtTime(valueToSet, now, defaultRampTime);
+                 else if (paramPath === 'delayFeedbackGain.gain.value' && delayFeedbackGain) delayFeedbackGain.gain.setTargetAtTime(valueToSet, now, defaultRampTime);
+                 else if (paramPath === 'delayLevel') {
+                     if (delayWetGain) delayWetGain.gain.setTargetAtTime(valueToSet, now, defaultRampTime);
+                     if (delayDryGain) delayDryGain.gain.setTargetAtTime(1 - valueToSet, now, defaultRampTime);
+                 }
+                 else if (paramPath === 'reverbLevel') {
+                     if (reverbWetGain) reverbWetGain.gain.setTargetAtTime(valueToSet, now, defaultRampTime);
+                     if (reverbDryGain) reverbDryGain.gain.setTargetAtTime(1 - valueToSet, now, defaultRampTime);
+                 }
+                 else if ((paramPath === 'vco1.octave' || paramPath === 'vco2.octave') && currentNote !== null) {
+                     // Update frequency if a note is playing
+                     const targetOsc1Freq = calculateVcoFrequency(currentFrequency, params.vco1);
+                     const targetOsc2Freq = calculateVcoFrequency(currentFrequency, params.vco2);
+                     if (vco1) vco1.frequency.setTargetAtTime(targetOsc1Freq, now, defaultRampTime);
+                     if (vco2) vco2.frequency.setTargetAtTime(targetOsc2Freq, now, defaultRampTime);
+                 }
+                 else if ((paramPath === 'masterTune' || paramPath === 'vco2.detune.value')) {
+                    // Update detune values
+                     if (vco1) vco1.detune.setTargetAtTime(params.masterTune, now, defaultRampTime);
+                     if (vco2) vco2.detune.setTargetAtTime(params.masterTune + params.vco2.detune.value, now, defaultRampTime);
+                 }
+                 // ADSR parameters don't directly control AudioParams, they are read by envelope functions
+                 // Portamento time also doesn't control an AudioParam directly
 
             } catch (e) { console.error(`Error setting AudioNode param ${paramPath}:`, e, "Value:", valueToSet); }
         }
@@ -1157,24 +1156,36 @@
 
     // Initialize or update all knobs based on their data attributes
     function updateAllKnobs(forceUpdate = false) {
-        if (!knobs) knobs = synthPanel.querySelectorAll('.knob'); // Ensure knobs are selected
+        if (!knobs) knobs = synthPanel.querySelectorAll('.knob');
         knobs.forEach(knob => {
-            let value;
-            // On initial forceUpdate, use the HTML data-value attribute as the source
-            if (forceUpdate && knob.hasAttribute('data-value')) {
-                 value = knob.getAttribute('data-value');
+            // Get initial *audio* value (or index for stepped) from HTML attribute
+            let initialValueStr = knob.getAttribute('data-value');
+            let valueToPass; // The initial value/index for updateParameter
+
+            const steps = knob.dataset.steps ? knob.dataset.steps.split(',') : null;
+
+            if (forceUpdate && initialValueStr !== null) {
+                 if (steps) {
+                     valueToPass = parseInt(initialValueStr); // Pass index for stepped
+                 } else {
+                     valueToPass = parseFloat(initialValueStr); // Pass audio value for linear/log
+                 }
             } else {
-                 // Otherwise, use the value stored in the dataset (updated by interactions)
-                 value = knob.dataset.value || knob.getAttribute('data-value') || 0;
+                 // If not forcing, use the current value in the dataset
+                 const currentDatasetValue = knob.dataset.value || initialValueStr || '0';
+                 if (steps) {
+                     valueToPass = parseInt(currentDatasetValue);
+                 } else {
+                      valueToPass = parseFloat(currentDatasetValue);
+                 }
             }
 
-            let numericValue = parseFloat(value);
-             // For stepped knobs, the value represents the index
-             if (knob.dataset.steps) numericValue = parseInt(value);
-
-            updateParameter(knob, numericValue, forceUpdate);
+            // On init, always use forceUpdate=true in call to updateParameter
+            // This ensures audio nodes get set even if context is suspended
+            updateParameter(knob, valueToPass, true);
         });
     }
+
 
     // Initialize or update all switches based on their data attributes
     function updateAllSwitches(forceUpdate = false) {
@@ -1192,50 +1203,102 @@
     let shiftKeyDown = false; // Tracks if Shift key is held for faster knob adjustment
     let intervalId = null; // Stores interval timer for repeating knob adjustments
 
-    // Helper function to handle knob value changes from mouse drag or keyboard
+    // Helper function to get the current percentage for any knob type
+    function getKnobPercentage(knob) {
+        const min = parseFloat(knob.dataset.min);
+        const max = parseFloat(knob.dataset.max);
+        const steps = knob.dataset.steps ? knob.dataset.steps.split(',') : null;
+        const isLog = knob.dataset.curve === 'log' && min > 0;
+        let currentValueStr = knob.dataset.value; // Read current value/index string
+        let percentage = 0.5; // Default
+
+        if (currentValueStr === undefined || currentValueStr === null) {
+            console.warn("Knob data-value is missing for percentage calculation:", knob.id);
+            currentValueStr = knob.getAttribute('data-value') || '0'; // Fallback to attribute
+        }
+
+        let currentValue = parseFloat(currentValueStr);
+
+        if (steps) {
+            const stepIndex = Math.round(currentValue);
+            percentage = steps.length > 1 ? stepIndex / (steps.length - 1) : 0.5;
+        } else if (isLog) {
+            if (currentValue <= min) percentage = 0;
+            else if (currentValue >= max) percentage = 1;
+            else percentage = Math.log(currentValue / min) / Math.log(max / min);
+        } else { // Linear
+             const range = max - min;
+             percentage = range > 0 ? (currentValue - min) / range : 0.5;
+        }
+        // Add safety check for NaN
+        if (isNaN(percentage)) {
+            console.error("Calculated percentage is NaN for knob:", knob.id, "Value:", currentValue);
+            percentage = 0.5; // Reset to default if calculation failed
+        }
+        return Math.max(0, Math.min(1, percentage)); // Clamp 0-1
+    }
+
+
+    // Helper function (modified for log knobs)
+    // adjustmentFn now calculates the *change in percentage*
     function handleKnobInteraction(knob, adjustmentFn) {
         const min = parseFloat(knob.dataset.min);
         const max = parseFloat(knob.dataset.max);
         const steps = knob.dataset.steps ? knob.dataset.steps.split(',') : null;
-        let currentValue = parseFloat(knob.dataset.value); // Current value from dataset
+        const isLog = knob.dataset.curve === 'log' && min > 0;
 
-        let newValue;
+        let currentPercentage = getKnobPercentage(knob); // Get current position as 0-1
+        let newValue; // This will be the new audio value or index
 
         if (steps) { // Stepped Knob
-            // adjustmentFn provides the *change* in steps (e.g., +1, -1)
-            let currentStepIndex = Math.round(currentValue);
-            newValue = currentStepIndex + adjustmentFn(0, 1); // Base step change is 1 index unit
-            newValue = Math.max(0, Math.min(steps.length - 1, newValue)); // Clamp index to valid range
-        } else { // Linear/Log Knob
-            let range = max - min; if (range <= 0) range = 1; // Avoid division by zero
-            let stepAmount = range / 100; // Base step for linear adjustment (1% of range)
-             // Apply logarithmic curve for value calculation if needed (this affects keyboard steps)
-             if (knob.dataset.curve === 'log' && min > 0) {
-                // For log, make steps larger at higher values? More complex. Keep linear steps for now.
-             }
-            newValue = adjustmentFn(currentValue, stepAmount); // adjustmentFn provides the *new* value directly
-            newValue = Math.max(min, Math.min(max, newValue)); // Clamp value to min/max
+            let currentStepIndex = Math.round(currentPercentage * (steps.length - 1));
+            // adjustmentFn provides the *change* in steps (+1, -1)
+            let stepChange = adjustmentFn(0, 1); // Pass dummy step size, get step change
+            newValue = currentStepIndex + stepChange;
+            newValue = Math.max(0, Math.min(steps.length - 1, Math.round(newValue))); // Clamp index
+        } else { // Linear or Logarithmic - work with percentages
+            // adjustmentFn provides the *change* in percentage (+0.01, -0.01 etc.)
+            let percentageChange = adjustmentFn(0, 0.01); // Pass base percentage step, get percentage change
+            let newPercentage = currentPercentage + percentageChange;
+            newPercentage = Math.max(0, Math.min(1, newPercentage)); // Clamp percentage 0-1
+
+            if (isLog) { // Convert percentage back to log audio value
+                 newValue = min * Math.pow(max / min, newPercentage);
+            } else { // Convert percentage back to linear audio value
+                const range = max - min;
+                newValue = min + newPercentage * range;
+            }
+             // Clamp final audio value just in case
+             newValue = Math.max(min, Math.min(max, newValue));
         }
 
-        // Only update if the value has actually changed (using tolerance for floats)
-        if (Math.abs(newValue - currentValue) > 1e-9) {
-            updateParameter(knob, newValue);
+        // Check for actual change before updating (compare against current data-value)
+        let currentValueInDataStr = knob.dataset.value;
+        if (currentValueInDataStr === undefined || currentValueInDataStr === null) currentValueInDataStr = '0'; // Handle missing data-value
+        let currentValueInData = parseFloat(currentValueInDataStr);
+
+        // Use a small tolerance for floating point comparisons
+        const tolerance = 1e-7;
+        if (Math.abs(newValue - currentValueInData) > tolerance) {
+             updateParameter(knob, newValue);
         }
     }
 
-    // Handles a single arrow key press for the focused knob
+    // Handles a single arrow key press for the focused knob (MODIFIED for percentage)
     function handleArrowPress(knob, direction, isShift) {
         const steps = knob.dataset.steps ? knob.dataset.steps.split(',') : null;
-        if (steps) {
-            // Stepped knob: Adjust index by 1 (or 2 if shift is held)
+        const isLog = knob.dataset.curve === 'log' && parseFloat(knob.dataset.min) > 0;
+
+        if (steps) { // Stepped
             const stepChange = (direction === 'left' ? -1 : 1) * (isShift ? 2 : 1);
-            handleKnobInteraction(knob, (current, step) => stepChange); // Pass index change
-        } else {
-            // Linear/Log knob: Adjust value by a calculated step amount
+            // adjustmentFn returns the step change directly
+            handleKnobInteraction(knob, (current, step) => stepChange);
+        } else { // Linear or Logarithmic - adjust percentage
             const multiplier = isShift ? 10 : 1; // Shift increases step size
-            handleKnobInteraction(knob, (current, step) => {
-                const effectiveStep = step * multiplier;
-                return direction === 'left' ? current - effectiveStep : current + effectiveStep; // Calculate new value
+            // adjustmentFn returns the *percentage change*
+            handleKnobInteraction(knob, (current, basePercentageStep) => {
+                const effectiveStep = basePercentageStep * multiplier;
+                return direction === 'left' ? -effectiveStep : effectiveStep;
             });
         }
     }
@@ -1248,6 +1311,11 @@
             if (!arrowKeyDown) { // Stop if key is released
                  stopArrowRepeat();
                  return;
+            }
+            // Check if the element still has focus
+            if (document.activeElement !== knob) {
+                stopArrowRepeat();
+                return;
             }
             handleArrowPress(knob, direction, isShift); // Adjust again
         }, 75); // Repeat speed (milliseconds)
@@ -1286,7 +1354,8 @@
         const note = keyToNoteMap[e.code]; // Map keyboard code to MIDI note
         if (!note || pressedKeys[e.code]) return; // Ignore unmapped keys or already pressed keys
 
-        e.preventDefault(); // Prevent default key actions (like typing in inputs)
+        // Prevent default key actions only if it's a note key
+        if (note) e.preventDefault();
 
         // Ensure audio context is running before playing
         let canPlay = isAudioResumed;
@@ -1338,12 +1407,18 @@
         // Release any sounding note immediately to prevent stuck notes
         if (currentNote !== null && audioContext && audioContext.state === 'running') {
             const now = audioContext.currentTime;
-            if (now > 0) {
+            // Check if now is valid (context might be closed/suspended unexpectedly)
+            if (now !== undefined && now > 0) {
                  // Instead of triggering release, just cut the sound instantly for safety on blur
-                 if (vcaGainNode) vcaGainNode.gain.cancelScheduledValues(now);
-                 if (vcaGainNode) vcaGainNode.gain.setValueAtTime(0.0001, now);
-                 if (filter) filter.frequency.cancelScheduledValues(now);
-                 // Optionally reset filter freq to base value?
+                 if (vcaGainNode) {
+                    vcaGainNode.gain.cancelScheduledValues(now);
+                    vcaGainNode.gain.setValueAtTime(0.0001, now);
+                 }
+                 if (filter) {
+                    filter.frequency.cancelScheduledValues(now);
+                    // Reset filter frequency to its base knob value when note stops abruptly
+                    filter.frequency.setValueAtTime(params.filter.frequency.value, now);
+                 }
             }
             currentNote = null;
             currentFrequency = 0;
@@ -1359,56 +1434,70 @@
     let isDragging = false; // Flag if a knob is currently being dragged
     let dragKnob = null; // Reference to the knob being dragged
     let startY = 0; // Initial mouse Y position on drag start
-    let startValue = 0; // Initial knob value (float) on drag start
-    let startStepIndex = 0; // Initial knob index for stepped knobs on drag start
+    let startValue = 0; // Initial knob *percentage* (0-1) on drag start
 
-    // Handles mouse movement during knob drag
+    // Handles mouse movement during knob drag (MODIFIED for percentage)
     function handleKnobMouseMove(e) {
         if (!isDragging || !dragKnob) return;
-        e.preventDefault(); // Prevent text selection during drag
+        e.preventDefault();
         const currentY = e.clientY;
-        const deltaY = startY - currentY; // Positive deltaY means dragging up
+        const deltaY = startY - currentY; // Positive deltaY = dragging up
 
         const steps = dragKnob.dataset.steps ? dragKnob.dataset.steps.split(',') : null;
+        const min = parseFloat(dragKnob.dataset.min); // Needed for log/linear calc
+        const max = parseFloat(dragKnob.dataset.max); // Needed for log/linear calc
+        const isLog = dragKnob.dataset.curve === 'log' && min > 0;
 
-        if (steps) { // Stepped Knob Drag
-            const pixelsPerStep = 20; // How many pixels mouse must move vertically for one step change
-            const stepChange = Math.round(deltaY / pixelsPerStep);
-            let newStepIndex = startStepIndex + stepChange;
-            newStepIndex = Math.max(0, Math.min(steps.length - 1, newStepIndex)); // Clamp index
+        // startValue now holds the starting *percentage* (set in mousedown listener)
+        let startPercentage = startValue;
 
-            // Only update parameter if the calculated index is different from the current one
-            if (newStepIndex !== Math.round(parseFloat(dragKnob.dataset.value))) {
+        if (steps) { // Stepped Knob Drag (based on percentage)
+            const pixelsPerStep = 20; // Adjust sensitivity
+            const totalSteps = steps.length;
+            if (totalSteps <= 1) return; // Avoid division by zero
+
+            // Calculate percentage change based on total knob travel for steps
+            const totalDragPixelsForSteps = pixelsPerStep * (totalSteps - 1);
+            const percentageChange = totalDragPixelsForSteps > 0 ? (deltaY / totalDragPixelsForSteps) : 0;
+
+            let newPercentage = startPercentage + percentageChange;
+            newPercentage = Math.max(0, Math.min(1, newPercentage));
+
+            let newStepIndex = Math.round(newPercentage * (totalSteps - 1));
+
+            // Read current index from data-value to compare
+             let currentValueInDataStr = dragKnob.dataset.value;
+             if (currentValueInDataStr === undefined || currentValueInDataStr === null) currentValueInDataStr = '0';
+             let currentStepIndex = Math.round(parseFloat(currentValueInDataStr));
+
+             if (newStepIndex !== currentStepIndex) {
                  updateParameter(dragKnob, newStepIndex);
-                 // Note: We don't update startStepIndex here. Dragging continues relative to the initial mousedown index.
-                 // This feels more natural than constantly resetting the base index.
+             }
+
+        } else { // Linear or Logarithmic Drag (based on percentage)
+            const dragRangePixels = 150; // Pixels for full 0-1 range, adjust sensitivity
+            const deltaPercentage = deltaY / dragRangePixels;
+            let newPercentage = startPercentage + deltaPercentage;
+            newPercentage = Math.max(0, Math.min(1, newPercentage)); // Clamp 0-1
+
+            let newValue; // The new audio value
+            if (isLog) {
+                // Clamp percentage slightly away from 0 to avoid issues with Math.pow if min is very small
+                const epsilon = 1e-9;
+                const clampedPercentage = Math.max(epsilon, newPercentage);
+                newValue = min * Math.pow(max / min, clampedPercentage);
+            } else { // Linear
+                 const range = max - min;
+                 newValue = min + newPercentage * range;
             }
+             newValue = Math.max(min, Math.min(max, newValue)); // Clamp audio value
 
-        } else { // Linear/Log Knob Drag
-            // Use handleKnobInteraction to calculate the new value based on drag delta
-            handleKnobInteraction(dragKnob, (current, step) => { // 'step' is not used here
-                const min = parseFloat(dragKnob.dataset.min);
-                const max = parseFloat(dragKnob.dataset.max);
-                const range = max - min;
-                const dragSensitivity = 1.8; // Adjusts how much drag affects value (higher = more sensitive)
-                // Calculate change per pixel based on range and sensitivity
-                const changePerPixel = (range > 0 ? range / 150 : 1 / 150) * dragSensitivity; // 150 pixels = full range approx
-                let valueChange = deltaY * changePerPixel;
-
-                let newValue;
-                // Apply log scaling during drag calculation if needed
-                if (dragKnob.dataset.curve === 'log' && min > 0) {
-                     // This is tricky. Simple linear delta applied to log scale isn't quite right.
-                     // For now, treat drag as linear adjustment on the underlying value.
-                     newValue = startValue + valueChange;
-                } else {
-                    newValue = startValue + valueChange; // Calculate new value linearly from start
-                }
-
-                return newValue; // Clamping happens within handleKnobInteraction
-            });
+            // Update parameter with the new audio value
+            // updateParameter will handle clamping and storing this value
+             updateParameter(dragKnob, newValue);
         }
     }
+
 
     // Stops the knob dragging operation
     function stopDrag() {
@@ -1427,41 +1516,64 @@
     function setupKnobListeners() {
         if (!knobs) knobs = synthPanel.querySelectorAll('.knob');
         knobs.forEach(knob => {
-            knob.addEventListener('mousedown', (e) => {
-                // Attempt to resume audio context on any knob interaction
-                if (!isAudioResumed && isAudioInitialized) ensureAudioContextResumed();
+            knob.addEventListener('mousedown', async (e) => { // Make async if using ensureAudioContextResumed
+                // Ensure audio context is running or attempt to resume
+                let canInteract = isAudioResumed;
+                if (!canInteract && isAudioInitialized) {
+                    canInteract = await ensureAudioContextResumed(); // Await resume attempt
+                }
+                // Optionally prevent interaction if context couldn't resume
+                 if (!canInteract && isAudioInitialized) { // Only check if initialized but not resumed
+                     console.warn("Audio Context not running, cannot interact.");
+                     return;
+                 }
 
-                e.preventDefault(); // Prevent text selection
+                e.preventDefault();
                 isDragging = true;
                 dragKnob = knob;
-                startY = e.clientY; // Record starting mouse position
-                startValue = parseFloat(knob.dataset.value); // Record starting knob value
-                startStepIndex = Math.round(startValue); // Record starting index for stepped knobs
-                document.body.classList.add('dragging'); // Add dragging cursor styling
-                // Add global listeners to track mouse movement anywhere on the page
+                startY = e.clientY;
+
+                // *** MODIFIED: Store the starting PERCENTAGE for drag ***
+                startValue = getKnobPercentage(knob); // Use helper to get 0-1 value
+
+                document.body.classList.add('dragging');
                 document.addEventListener('mousemove', handleKnobMouseMove);
                 document.addEventListener('mouseup', stopDrag);
-                document.addEventListener('mouseleave', stopDrag); // Stop drag if mouse leaves window
-                knob.focus(); // Focus the knob for keyboard interaction
+                document.addEventListener('mouseleave', stopDrag);
+                knob.focus();
             });
 
             knob.addEventListener('dblclick', (e) => {
                 // Reset knob to its initial default value on double click
-                // Use the value from the original HTML 'data-value' attribute
-                let defaultValue = parseFloat(knob.getAttribute('data-value') || '0');
-                 if (knob.dataset.steps) defaultValue = parseInt(knob.getAttribute('data-value') || '0');
-                 updateParameter(knob, defaultValue);
+                let defaultValueStr = knob.getAttribute('data-value') || '0';
+                let defaultValue;
+                 if (knob.dataset.steps) {
+                     defaultValue = parseInt(defaultValueStr);
+                 } else {
+                     defaultValue = parseFloat(defaultValueStr);
+                 }
+                // Pass the default *value* or *index*
+                updateParameter(knob, defaultValue);
             });
         });
     }
+
 
     // -- Switch Click/Key Listeners --
     function setupSwitchListeners() {
         if (!switches) switches = synthPanel.querySelectorAll('.switch');
         switches.forEach(sw => {
-            const triggerSwitch = () => {
+            const triggerSwitch = async () => { // Make async for ensureAudioContextResumed
                 // Attempt to resume audio context on interaction
-                if (!isAudioResumed && isAudioInitialized) ensureAudioContextResumed();
+                let canInteract = isAudioResumed;
+                if (!canInteract && isAudioInitialized) {
+                    canInteract = await ensureAudioContextResumed();
+                }
+                 if (!canInteract && isAudioInitialized) { // Check again after attempting resume
+                     console.warn("Audio Context not running, cannot interact.");
+                     return;
+                 }
+
                 const currentState = sw.dataset.state;
                 const newState = currentState === 'up' ? 'down' : 'up'; // Toggle state
                 updateParameter(sw, newState);
@@ -1471,7 +1583,7 @@
                 // Allow toggling with Enter or Space when switch is focused
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault(); // Prevent default space bar scroll
-                    triggerSwitch();
+                    triggerSwitch(); // Call the async trigger function
                 }
             });
         });
@@ -1480,9 +1592,10 @@
     // -- General Interaction Listener for Audio Context --
     // Ensures audio context can start on first click anywhere on the synth panel
     function setupGeneralInteractionListener() {
-        synthPanel.addEventListener('click', () => {
+        // Use 'pointerdown' as it often fires earlier than 'click' and covers touch/pen
+        synthPanel.addEventListener('pointerdown', () => {
             if (!isAudioResumed && isAudioInitialized) ensureAudioContextResumed();
-        }, { capture: true }); // Use capture phase to catch clicks on child elements too
+        }, { capture: true, once: true }); // Use capture phase and only run once
     }
 
     // --- INITIALIZATION ---
@@ -1492,17 +1605,18 @@
         switches = synthPanel.querySelectorAll('.switch');
 
         // Initialize audio graph and parameters first
-        initAudio(); // This now also sets initial FX params and connects the graph
+        // initAudio now calls updateAllKnobs/Switches internally at the end
+        initAudio();
 
-        // Set initial UI state based on params (requires audio nodes to exist)
-        // 'true' flag ensures AudioNodes are updated even if context is suspended initially
-        updateAllKnobs(true);
-        updateAllSwitches(true);
-
-        // Setup event listeners for UI elements
-        setupKnobListeners();
-        setupSwitchListeners();
-        setupGeneralInteractionListener();
+        // Setup event listeners for UI elements AFTER initAudio has run
+        // (initAudio ensures nodes exist before listeners try to use them)
+        if (isAudioInitialized) {
+            setupKnobListeners();
+            setupSwitchListeners();
+            setupGeneralInteractionListener();
+        } else {
+            console.error("Audio initialization failed, UI listeners not attached.");
+        }
 
 
         console.log("Mono Synth Ready. Click panel or press keys (A, W, S, E, D, F, T, G, Y, H, U, J, K) to start audio and play.");
