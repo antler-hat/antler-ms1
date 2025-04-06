@@ -65,6 +65,7 @@
             align-items: center;
             gap: 5px;
             width: 100%; /* Ensure control groups take width for alignment */
+            height: 80px;
         }
 
          .control-group-horizontal {
@@ -81,6 +82,7 @@
             letter-spacing: .1em;
             text-transform: uppercase;
             color: #bbb;
+            line-height: 1rem;
         }
 
         .waveform-label {
@@ -119,7 +121,6 @@
         .switch {
              width: 50px;  /* Wider */
              height: 30px; /* Shorter */
-             background-color: #ccc;
              border: 1px solid #555;
              cursor: pointer;
              position: relative;
@@ -132,8 +133,8 @@
             position: absolute;
             top: 2px;      /* Vertical positioning */
             bottom: 2px;   /* Vertical positioning */
-            width: 23px;   /* Handle width */
-            background-color: #444;
+            width: 5px;   /* Handle width */
+            background-color: #eeeeee;
             border: 1px solid #222;
             border-radius: 2px;
             transition: left 0.1s ease-in-out; /* Animate left property */
@@ -141,11 +142,11 @@
 
          /* State 'up' visually corresponds to the left position (first value) */
          .switch[data-state="up"] .switch-handle {
-             left: 2px;
+             left: 40px;
          }
          /* State 'down' visually corresponds to the right position (second value) */
          .switch[data-state="down"] .switch-handle {
-             left: 25px; /* 50px total width - 23px handle width - 2px left margin */
+             left: 2px; /* 50px total width - 23px handle width - 2px left margin */
          }
 
         .switch:focus {
@@ -178,17 +179,13 @@
              grid-template-columns: repeat(4, 1fr); /* 4 equal columns */
              width: 100%;
              gap: 5px 10px; /* Row and column gap */
-             margin-top: 10px; /* Space above ADSR */
-             margin-bottom: 10px; /* Space below ADSR */
          }
 
          /* VCF Specific */
         #vcf-filter-controls {
             display: flex; /* Use flexbox for horizontal alignment */
             justify-content: space-around; /* Space out controls */
-            align-items: center; /* Center items vertically */
             width: 100%;
-            margin-bottom: 10px;
             gap: 10px; /* Add gap between filter controls */
         }
         #vcf-mod-controls {
@@ -313,7 +310,7 @@
         <div id="vcf-filter-controls"> <!-- Horizontal layout -->
             <div class="control-group">
                 <label for="vcf-cutoff">Cutoff</label>
-                <div class="knob" id="vcf-cutoff" data-param="filter.frequency.value" data-min="20" data-max="20000" data-value="20000" data-curve="log" tabindex="0"></div>
+                <div class="knob" id="vcf-cutoff" data-param="filter.frequency.value" data-min="20" data-max="20000" data-value="20000" tabindex="0"></div>
             </div>
              <div class="control-group">
                 <label for="vcf-res">Res</label>
@@ -324,7 +321,7 @@
                  <div class="switch" id="vcf-type" data-state="down" data-param="filter.type" data-values="highpass,lowpass" tabindex="0">
                      <div class="switch-handle"></div>
                  </div>
-                 <label style="font-size:0.6em;" id="vcf-type-label">LPF</label>
+                 <label style="font-size:0.6em;" id="vcf-type-label">LO HI</label>
              </div>
         </div>
         <div class="adsr-group">
@@ -397,29 +394,35 @@
             <label for="portamento">Portamento</label>
             <div class="knob" id="portamento" data-param="portamentoTime" data-min="0" data-max="0.5" data-value="0" tabindex="0"></div>
         </div>
-         <div class="control-group">
-            <label for="distortion-amount">Drive</label>
-            <div class="knob" id="distortion-amount" data-param="distortionAmount" data-min="0" data-max="100" data-value="0" tabindex="0"></div>
+        <div class="control-group-horizontal">
+            <div class="control-group">
+                <label for="delay-time">Dly Time</label>
+                <div class="knob" id="delay-time" data-param="delayTime.delayTime.value" data-min="0.05" data-max=".75" data-value="0.15" data-curve="log" tabindex="0"></div>
+            </div>
+            <div class="control-group">
+                <label for="delay-feedback">Dly Fdbk</label>
+                <div class="knob" id="delay-feedback" data-param="delayFeedbackGain.gain.value" data-min="0" data-max="1" data-value=".5" tabindex="0"></div> <!-- Max feedback < 1 -->
+            </div>
         </div>
-        <div class="control-group">
-            <label for="delay-time">Dly Time</label>
-            <div class="knob" id="delay-time" data-param="delayTime.delayTime.value" data-min="0.05" data-max=".75" data-value="0" data-curve="log" tabindex="0"></div>
+        <div class="control-group-horizontal">
+            <div class="control-group">
+                <label for="delay-level">Dly Level</label>
+                <div class="knob" id="delay-level" data-param="delayLevel" data-min="0" data-max="1" data-value="0" tabindex="0"></div> <!-- Wet/Dry Mix -->
+            </div>
+            <div class="control-group">
+                <label for="reverb-level">Reverb</label>
+                <div class="knob" id="reverb-level" data-param="reverbLevel" data-min="0" data-max="1" data-value="0" tabindex="0"></div> <!-- Wet/Dry Mix -->
+            </div>
         </div>
-         <div class="control-group">
-            <label for="delay-feedback">Dly Fdbk</label>
-            <div class="knob" id="delay-feedback" data-param="delayFeedbackGain.gain.value" data-min="0" data-max="0.9" data-value="0" tabindex="0"></div> <!-- Max feedback < 1 -->
-        </div>
-        <div class="control-group">
-            <label for="delay-level">Dly Level</label>
-            <div class="knob" id="delay-level" data-param="delayLevel" data-min="0" data-max="1" data-value="0" tabindex="0"></div> <!-- Wet/Dry Mix -->
-        </div>
-        <div class="control-group">
-            <label for="reverb-level">Reverb</label>
-            <div class="knob" id="reverb-level" data-param="reverbLevel" data-min="0" data-max="1" data-value="0" tabindex="0"></div> <!-- Wet/Dry Mix -->
-        </div>
-        <div class="control-group">
-            <label for="volume">Volume</label>
-            <div class="knob" id="volume" data-param="masterGain.gain.value" data-min="0" data-max="1" data-value="0.5" tabindex="0"></div>
+        <div class="control-group-horizontal">
+            <div class="control-group">
+                <label for="volume">Volume</label>
+                <div class="knob" id="volume" data-param="masterGain.gain.value" data-min="0" data-max="1" data-value="0.5" tabindex="0"></div>
+            </div>
+            <div class="control-group">
+                <label for="distortion-amount">Drive</label>
+                <div class="knob" id="distortion-amount" data-param="distortionAmount" data-min="0" data-max="100" data-value="0" tabindex="0"></div>
+            </div>
         </div>
     </div>
 
@@ -993,8 +996,6 @@
     function updateSwitchVisual(sw) {
         const state = sw.dataset.state; // 'up' or 'down'
         const handle = sw.querySelector('.switch-handle');
-        // Update handle position based on state ('up' = left, 'down' = right for horizontal)
-        if (handle) handle.style.left = state === 'up' ? '2px' : '25px';
 
         // Update associated label text if one exists (e.g., vcf-type-label)
         const labelId = sw.id + '-label';
@@ -1004,7 +1005,7 @@
         if (sw.dataset.values) { // If values are defined (e.g., "highpass,lowpass")
             const values = sw.dataset.values.split(',');
             const text = state === 'up' ? values[0] : values[1]; // 'up' maps to first value
-            labelElement.textContent = text.substring(0,3).toUpperCase(); // Display first 3 chars (e.g., HIG, LOW)
+            labelElement.textContent = text.substring(0,2).toUpperCase(); // Display first 3 chars (e.g., HIG, LOW)
         } else { // Default label update if no specific values
             labelElement.textContent = state === 'up' ? 'UP' : 'DOWN';
         }
