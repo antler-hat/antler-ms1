@@ -30,6 +30,15 @@
             cursor: ns-resize; /* Cursor during knob drag */
         }
 
+        h1 {
+            font-size: 15px;
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: #ccc;
+            width: 100%;
+            padding-bottom: 5px;
+        }
+
         .synth-panel {
             padding: 20px;
             display: grid;
@@ -214,6 +223,8 @@
          }
 
         /* --- Specific Module Layout (4 columns) --- */
+        #title-module { grid-column: 1 / span 4; grid-row: 3; }
+        
         #lfo-module { grid-column: 1; grid-row: 1; }
         #mixer-module { grid-column: 1; grid-row: 2; }
 
@@ -281,6 +292,9 @@
 <body>
 
 <div class="synth-panel" id="synth-panel">
+    <div id="title-module">
+        <h1>DB-POL1</h1>
+    </div>
     <!-- LFO -->
     <div class="module" id="lfo-module">
         <div class="module-title">LFO</div>
