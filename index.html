@@ -485,13 +485,13 @@
         distortionAmount: 0, // Amount for WaveShaper curve
         delayTime: { delayTime: { value: 0 } }, // Delay time node parameter
         delayFeedbackGain: { gain: { value: 0 } }, // Feedback gain node parameter
-        delayLevel: 0, // Wet/Dry mix for delay (0=dry, 1=wet)
-        reverbLevel: 0, // Wet/Dry mix for reverb (0=dry, 1=wet)
+        delayLevel: 0, // Controls delayWetGain level (0=off, 1=full wet)
+        reverbLevel: 0, // Controls reverbWetGain level (0=off, 1=full wet)
         // Internal nodes for FX chain control
         delayWetGain: { gain: { value: 0 } },
-        delayDryGain: { gain: { value: 1 } },
+        // delayDryGain: { gain: { value: 1 } }, // REMOVED
         reverbWetGain: { gain: { value: 0 } },
-        reverbDryGain: { gain: { value: 1 } },
+        // reverbDryGain: { gain: { value: 1 } }, // REMOVED
         masterGain: { gain: { value: 0.5 } }
     };
 
@@ -615,7 +615,7 @@
             // --- Load the AudioWorklet module ---
             console.log("Loading Random LFO AudioWorklet module...");
             try {
-                await audioContext.audioWorklet.addModule('random-lfo-processor.js');
+            await audioContext.audioWorklet.addModule('random-lfo-processor.js');
                 console.log("AudioWorklet module loaded successfully.");
             } catch (e) {
                  throw new Error(`Failed to load AudioWorklet module: ${e.message}`);
@@ -673,10 +673,10 @@
             delay = audioContext.createDelay(2.0); params.delayTime.node = delay;
             delayFeedbackGain = audioContext.createGain(); params.delayFeedbackGain.node = delayFeedbackGain;
             delayWetGain = audioContext.createGain(); params.delayWetGain.node = delayWetGain;
-            delayDryGain = audioContext.createGain(); params.delayDryGain.node = delayDryGain;
+            // delayDryGain = audioContext.createGain(); params.delayDryGain.node = delayDryGain; // REMOVED
             reverb = audioContext.createConvolver(); params.reverb = { node: reverb };
             reverbWetGain = audioContext.createGain(); params.reverbWetGain.node = reverbWetGain;
-            reverbDryGain = audioContext.createGain(); params.reverbDryGain.node = reverbDryGain;
+            // reverbDryGain = audioContext.createGain(); params.reverbDryGain.node = reverbDryGain; // REMOVED
 
 
             // --- Create Reverb Impulse ---
@@ -730,19 +730,33 @@
             vcaGainNode.connect(effectsInput);
 
             // --- FX Chain Connections --- (Unchanged)
+            // Input -> Distortion
             effectsInput.connect(distortion);
-            distortion.connect(delayDryGain);
+
+            // --- DRY PATH ---
+            // Distortion output goes DIRECTLY to Master Gain (always on)
+            distortion.connect(masterGain);
+
+            // --- DELAY WET PATH ---
+            // Distortion also feeds the Delay input
             distortion.connect(delay);
+            // Delay Feedback Loop
             delay.connect(delayFeedbackGain);
             delayFeedbackGain.connect(delay);
+            // Delay output goes through its Wet Gain control
             delay.connect(delayWetGain);
-            delayDryGain.connect(reverbDryGain);
-            delayWetGain.connect(reverbDryGain);
-            delayDryGain.connect(reverb);
-            delayWetGain.connect(reverb);
+            // Delay Wet Gain output goes to Master Gain (mixed additively)
+            delayWetGain.connect(masterGain);
+
+            // --- REVERB WET PATH ---
+            // Distortion also feeds the Reverb input (parallel to delay)
+            distortion.connect(reverb);
+            // Reverb output goes through its Wet Gain control
             reverb.connect(reverbWetGain);
-            reverbDryGain.connect(masterGain);
+            // Reverb Wet Gain output goes to Master Gain (mixed additively)
             reverbWetGain.connect(masterGain);
+
+            // Master Gain -> Destination (Remains the same)
             masterGain.connect(audioContext.destination);
 
             // --- Start Persistent Oscillators ---
