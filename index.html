@@ -1347,34 +1347,94 @@
     // -- Mouse Input for Knobs --
     let isDragging = false; let dragKnob = null; let startY = 0; let startValue = 0; // startValue is percentage
 
-    function handleKnobMouseMove(e) { // Keep modified version
+    // Handles mouse movement during knob drag (MODIFIED for direct filter update)
+    function handleKnobMouseMove(e) {
         if (!isDragging || !dragKnob) return;
-        e.preventDefault(); const currentY = e.clientY; const deltaY = startY - currentY;
+        e.preventDefault();
+        const currentY = e.clientY;
+        const deltaY = startY - currentY; // Positive deltaY = dragging up
+
         const steps = dragKnob.dataset.steps ? dragKnob.dataset.steps.split(',') : null;
-        const min = parseFloat(dragKnob.dataset.min); const max = parseFloat(dragKnob.dataset.max);
+        const min = parseFloat(dragKnob.dataset.min);
+        const max = parseFloat(dragKnob.dataset.max);
         const isLog = dragKnob.dataset.curve === 'log' && min > 0;
+        const paramPath = dragKnob.dataset.param; // Get the parameter path
+
+        // startValue holds the starting *percentage* (set in mousedown listener)
         let startPercentage = startValue;
+        let newValue; // This will be the new audio value or index
+
         if (steps) {
-            const pixelsPerStep = 20; const totalSteps = steps.length; if (totalSteps <= 1) return;
+            // --- Stepped Knob Drag Logic ---
+            const pixelsPerStep = 20;
+            const totalSteps = steps.length;
+            if (totalSteps <= 1) return;
             const totalDragPixelsForSteps = pixelsPerStep * (totalSteps - 1);
             const percentageChange = totalDragPixelsForSteps > 0 ? (deltaY / totalDragPixelsForSteps) : 0;
-            let newPercentage = startPercentage + percentageChange; newPercentage = Math.max(0, Math.min(1, newPercentage));
-            let newStepIndex = Math.round(newPercentage * (totalSteps - 1));
-             let currentValueInDataStr = dragKnob.dataset.value; if (currentValueInDataStr === undefined || currentValueInDataStr === null) currentValueInDataStr = '0';
-             let currentStepIndex = Math.round(parseFloat(currentValueInDataStr));
-             if (newStepIndex !== currentStepIndex) updateParameter(dragKnob, newStepIndex);
+            let newPercentage = startPercentage + percentageChange;
+            newPercentage = Math.max(0, Math.min(1, newPercentage));
+            newValue = Math.round(newPercentage * (totalSteps - 1)); // Calculate new index
+
+            // Check against current data-value (which stores index for stepped)
+            let currentValueInDataStr = dragKnob.dataset.value;
+            if (currentValueInDataStr === undefined || currentValueInDataStr === null) currentValueInDataStr = '0';
+            let currentStepIndex = Math.round(parseFloat(currentValueInDataStr));
+
+            if (newValue !== currentStepIndex) {
+                 updateParameter(dragKnob, newValue); // Use standard update for stepped
+             }
+
         } else {
-            const dragRangePixels = 150; const deltaPercentage = deltaY / dragRangePixels;
-            let newPercentage = startPercentage + deltaPercentage; newPercentage = Math.max(0, Math.min(1, newPercentage));
-            let newValue;
+            // --- Linear or Logarithmic Drag Logic ---
+            const dragRangePixels = 150;
+            const deltaPercentage = deltaY / dragRangePixels;
+            let newPercentage = startPercentage + deltaPercentage;
+            newPercentage = Math.max(0, Math.min(1, newPercentage)); // Clamp 0-1
+
+            // Calculate the new audio value
             if (isLog) {
                 const epsilon = 1e-9; const clampedPercentage = Math.max(epsilon, newPercentage);
                 newValue = min * Math.pow(max / min, clampedPercentage);
-            } else {
+            } else { // Linear
                  const range = max - min; newValue = min + newPercentage * range;
             }
-             newValue = Math.max(min, Math.min(max, newValue));
-             updateParameter(dragKnob, newValue);
+             newValue = Math.max(min, Math.min(max, newValue)); // Clamp audio value
+
+             // *** SPECIAL HANDLING FOR FILTER CUTOFF DURING DRAG ***
+             if (paramPath === 'filter.frequency.value') {
+                 // Check if value actually changed significantly enough
+                 let currentValueInDataStr = dragKnob.dataset.value;
+                 if (currentValueInDataStr === undefined || currentValueInDataStr === null) currentValueInDataStr = '0';
+                 let currentValueInData = parseFloat(currentValueInDataStr);
+                 const tolerance = 1e-3; // Tolerance for float comparison
+
+                 if (Math.abs(newValue - currentValueInData) > tolerance) {
+                     const now = audioContext.currentTime;
+
+                     // 1. Update internal state directly (bypass updateParameter's audio node part)
+                     params.filter.frequency.value = newValue;
+                     dragKnob.dataset.value = newValue.toFixed(5); // Store new audio value
+
+                     // 2. Update visual directly
+                     updateKnobVisual(dragKnob, newPercentage, newValue);
+
+                     // 3. Update AudioNode DIRECTLY using setValueAtTime for responsiveness
+                     if (filter) {
+                         filter.frequency.setValueAtTime(newValue, now);
+                     }
+                 }
+             } else {
+                 // *** For all OTHER knobs, use the standard updateParameter ***
+                  // Check if value actually changed significantly enough
+                 let currentValueInDataStr = dragKnob.dataset.value;
+                 if (currentValueInDataStr === undefined || currentValueInDataStr === null) currentValueInDataStr = '0';
+                 let currentValueInData = parseFloat(currentValueInDataStr);
+                 const tolerance = 1e-7; // Can use smaller tolerance for others
+
+                 if (Math.abs(newValue - currentValueInData) > tolerance) {
+                    updateParameter(dragKnob, newValue);
+                 }
+             }
         }
     }
     function stopDrag() { // Unchanged
