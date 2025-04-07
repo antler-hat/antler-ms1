@@ -910,30 +910,43 @@
             console.warn("noteOn called but audio context not running or VCOs not ready!");
             return;
         }
+
         const now = audioContext.currentTime;
         const portamento = params.portamentoTime > 0.005 ? params.portamentoTime : 0;
         const targetOsc1Freq = calculateVcoFrequency(freq, params.vco1);
         const targetOsc2Freq = calculateVcoFrequency(freq, params.vco2);
 
-        if (currentNote !== null) {
+        if (currentNote !== null) { // --- LEGATO TRANSITION ---
             currentFrequency = freq;
             currentNote = note;
+
+            // Update Oscillator Frequencies
             if (portamento > 0) {
-                vco1.frequency.cancelScheduledValues(now); vco2.frequency.cancelScheduledValues(now);
+                vco1.frequency.cancelScheduledValues(now);
+                vco2.frequency.cancelScheduledValues(now);
                 vco1.frequency.setTargetAtTime(targetOsc1Freq, now, portamento / 4);
                 vco2.frequency.setTargetAtTime(targetOsc2Freq, now, portamento / 4);
             } else {
-                vco1.frequency.cancelScheduledValues(now); vco2.frequency.cancelScheduledValues(now);
+                vco1.frequency.cancelScheduledValues(now);
+                vco2.frequency.cancelScheduledValues(now);
                 vco1.frequency.setValueAtTime(targetOsc1Freq, now);
                 vco2.frequency.setValueAtTime(targetOsc2Freq, now);
             }
-            triggerEnvelopes(now);
-        } else {
+
+            // --- !!! FIX: DO NOT RE-TRIGGER ENVELOPES ON LEGATO !!! ---
+            // triggerEnvelopes(now);  // <--- REMOVE OR COMMENT OUT THIS LINE
+
+        } else { // --- FIRST NOTE PRESS ---
             currentFrequency = freq;
             currentNote = note;
-            vco1.frequency.cancelScheduledValues(now); vco2.frequency.cancelScheduledValues(now);
+
+            // Set initial frequency immediately
+            vco1.frequency.cancelScheduledValues(now);
+            vco2.frequency.cancelScheduledValues(now);
             vco1.frequency.setValueAtTime(targetOsc1Freq, now);
             vco2.frequency.setValueAtTime(targetOsc2Freq, now);
+
+            // Trigger envelopes ONLY for the first note press
             triggerEnvelopes(now);
         }
     }
