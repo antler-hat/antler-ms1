@@ -562,6 +562,8 @@
         try {
             if (audioContext.state === 'running') {
                 if (!isAudioResumed) isAudioResumed = true;
+                // Might have been initialized running, ensure ramp happens
+                rampUpMasterGain();
                 return true;
             }
             if (audioContext.state === 'suspended') {
@@ -570,6 +572,8 @@
                 if (audioContext.state === 'running') {
                     console.log("AudioContext Resumed successfully.");
                     isAudioResumed = true;
+                    // *** RAMP UP GAIN AFTER RESUME ***
+                    rampUpMasterGain();
                     return true;
                 }
                 console.warn("AudioContext state is still not 'running' after resume attempt:", audioContext.state);
@@ -592,6 +596,23 @@
             isAudioResumed = false;
             return false;
         }
+    }
+
+    // Function to ramp up master gain after context is ready
+    function rampUpMasterGain() {
+        if (!audioContext || !masterGain || audioContext.state !== 'running') {
+             console.warn("Cannot ramp up master gain, context not ready.");
+            return;
+        }
+
+        const targetVolume = params.masterGain.gain.value; // Get target from params
+        const rampTime = 0.05; // Short ramp time (50ms) - adjust if needed
+
+        console.log(`Ramping master gain to ${targetVolume} over ${rampTime}s`);
+        masterGain.gain.linearRampToValueAtTime(
+            targetVolume,
+            audioContext.currentTime + rampTime
+        );
     }
 
     // Make initAudio async to handle worklet loading
@@ -626,13 +647,22 @@
 
             // --- Create Core Synth Nodes ---
             try {
-                masterGain = audioContext.createGain(); params.masterGain.node = masterGain;
+                masterGain = audioContext.createGain();
+                // *** START MASTER GAIN AT 0 ***
+                masterGain.gain.value = 0;
+                params.masterGain.node = masterGain; // Keep node references                
                 vco1 = audioContext.createOscillator(); params.vco1.node = vco1;
                 vco2 = audioContext.createOscillator(); params.vco2.node = vco2;
                 vco1Gain = audioContext.createGain(); params.vco1Gain.node = vco1Gain;
                 vco2Gain = audioContext.createGain(); params.vco2Gain.node = vco2Gain;
                 noiseGain = audioContext.createGain(); params.noiseGain.node = noiseGain;
                 filter = audioContext.createBiquadFilter(); params.filter.node = filter;
+                // *** EXPLICITLY SET INITIAL FILTER FREQUENCY ***
+                // Use setValueAtTime for an immediate initial set, before ramps take over
+                // Read the default value directly from the initial params object
+                const initialCutoff = params.filter.frequency.value;
+                filter.frequency.setValueAtTime(initialCutoff, audioContext.currentTime);
+                params.filter.node = filter;
                 vcaGainNode = audioContext.createGain(); vcaGainNode.gain.value = 0;
                 lfo = audioContext.createOscillator(); params.lfo.node = lfo;
                 vco1LfoGain = audioContext.createGain(); params.vco1LfoGain.node = vco1LfoGain;
@@ -775,6 +805,8 @@
             if (audioContext.state === 'running') {
                 isAudioResumed = true;
                 console.log("Audio graph initialized and context is running.");
+                // Ramp up gain immediately if already running
+                rampUpMasterGain();
             } else {
                 isAudioResumed = false;
                 console.log("Audio graph initialized, but context is suspended. Requires user interaction.");
@@ -1462,37 +1494,97 @@
         if (!knobs) knobs = synthPanel.querySelectorAll('.knob');
         knobs.forEach(knob => {
             knob.addEventListener('mousedown', async (e) => {
-                let canInteract = isAudioResumed; if (!canInteract && isAudioInitialized) canInteract = await ensureAudioContextResumed();
-                if (!canInteract && isAudioInitialized) { console.warn("Audio Context not running."); return; }
-                e.preventDefault(); isDragging = true; dragKnob = knob; startY = e.clientY;
+                 // *** Ensure context is running before interaction logic ***
+                 let canInteract = isAudioResumed;
+                // Attempt resume only if needed
+                if (!canInteract && isAudioInitialized) {
+                    console.log("Mousedown: Audio not resumed, attempting...");
+                    canInteract = await ensureAudioContextResumed(); // Await resume attempt
+                    console.log("Mousedown: Resume attempt finished, canInteract:", canInteract);
+                 }
+                 // Prevent interaction if context couldn't resume or isn't initialized
+                  if (!isAudioInitialized || !canInteract) {
+                      console.warn("Audio Context not running or not initialized, cannot interact.");
+                      return;
+                  }
+                // *** End context check ***
+                console.log("Mousedown: Proceeding with knob interaction");
+                e.preventDefault();
+                isDragging = true;
+                dragKnob = knob;
+                startY = e.clientY;
                 startValue = getKnobPercentage(knob); // Store starting PERCENTAGE
+
                 document.body.classList.add('dragging');
                 document.addEventListener('mousemove', handleKnobMouseMove);
                 document.addEventListener('mouseup', stopDrag);
                 document.addEventListener('mouseleave', stopDrag);
                 knob.focus();
             });
-            knob.addEventListener('dblclick', (e) => { // Unchanged
-                let defaultValueStr = knob.getAttribute('data-value') || '0'; let defaultValue;
-                if (knob.dataset.steps) defaultValue = parseInt(defaultValueStr);
-                else defaultValue = parseFloat(defaultValueStr);
-                updateParameter(knob, defaultValue);
-            });
+
+        // Double click doesn't strictly need async resume, but safer to add
+        knob.addEventListener('dblclick', async (e) => {
+            let canInteract = isAudioResumed;
+                if (!canInteract && isAudioInitialized) {
+                    canInteract = await ensureAudioContextResumed();
+                }
+                if (!isAudioInitialized || !canInteract) {
+                    console.warn("Audio Context not running or not initialized, cannot interact with knob dblclick.");
+                    return;
+                }
+
+            // Reset knob to its initial default value on double click
+            let defaultValueStr = knob.getAttribute('data-value') || '0';
+            let defaultValue;
+                if (knob.dataset.steps) {
+                    defaultValue = parseInt(defaultValueStr);
+                } else {
+                    defaultValue = parseFloat(defaultValueStr);
+                }
+            // Pass the default *value* or *index*
+            updateParameter(knob, defaultValue);
         });
+        });
+            
     }
 
     // -- Switch Click/Key Listeners --
     function setupSwitchListeners() { // Keep modified version
         if (!switches) switches = synthPanel.querySelectorAll('.switch');
         switches.forEach(sw => {
-            const triggerSwitch = async () => {
-                let canInteract = isAudioResumed; if (!canInteract && isAudioInitialized) canInteract = await ensureAudioContextResumed();
-                if (!canInteract && isAudioInitialized) { console.warn("Audio Context not running."); return; }
-                const currentState = sw.dataset.state; const newState = currentState === 'up' ? 'down' : 'up';
+            // Define the async function separately for clarity
+            const triggerSwitch = async () => { // Make async
+                // *** Declare canInteract ONCE ***
+                let canInteract = isAudioResumed; // Check initial state
+
+                // Attempt resume only if needed
+                if (!canInteract && isAudioInitialized) {
+                    console.log("Switch Interaction: Audio not resumed, attempting...");
+                    canInteract = await ensureAudioContextResumed();
+                    console.log("Switch Interaction: Resume attempt finished, canInteract:", canInteract);
+                }
+
+                // Prevent interaction if context couldn't resume or isn't initialized
+                if (!isAudioInitialized || !canInteract) {
+                    console.warn("Audio Context not running or not initialized, cannot interact with switch.");
+                    return; // Exit if cannot interact
+                }
+                // *** End context check ***
+
+                console.log("Switch Interaction: Proceeding...");
+                const currentState = sw.dataset.state;
+                const newState = currentState === 'up' ? 'down' : 'up'; // Toggle state
                 updateParameter(sw, newState);
             };
+
+            // Assign the async function to the listeners
             sw.addEventListener('click', triggerSwitch);
-            sw.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); triggerSwitch(); } });
+            sw.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    triggerSwitch(); // Call the async function
+                }
+            });
         });
     }
 
