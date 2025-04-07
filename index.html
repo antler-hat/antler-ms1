@@ -359,11 +359,11 @@
          <div class="adsr-group">
             <div class="control-group">
                 <label for="vca-attack">Attack</label>
-                <div class="knob" id="vca-attack" data-param="vcaEnv.attack" data-min="0.005" data-max="2" data-value="0.01" tabindex="0"></div>
+                <div class="knob" id="vca-attack" data-param="vcaEnv.attack" data-min="0.005" data-max="2" data-value="0.005" tabindex="0"></div>
             </div>
             <div class="control-group">
                 <label for="vca-decay">Decay</label>
-                <div class="knob" id="vca-decay" data-param="vcaEnv.decay" data-min="0.005" data-max="2" data-value="0.1" tabindex="0"></div>
+                <div class="knob" id="vca-decay" data-param="vcaEnv.decay" data-min="0.005" data-max="2" data-value="2" tabindex="0"></div>
             </div>
             <div class="control-group">
                 <label for="vca-sustain">Sustain</label>
@@ -371,7 +371,7 @@
             </div>
             <div class="control-group">
                 <label for="vca-release">Release</label>
-                <div class="knob" id="vca-release" data-param="vcaEnv.release" data-min="0.005" data-max="5" data-value="0.2" tabindex="0"></div>
+                <div class="knob" id="vca-release" data-param="vcaEnv.release" data-min="0.005" data-max="5" data-value="0.005" tabindex="0"></div>
             </div>
         </div>
          <div id="vca-mod-controls">
@@ -466,14 +466,14 @@
     let isAudioInitialized = false;
     let isAudioResumed = false; // Tracks if user interaction has successfully resumed context
 
-    // ----- SYNTH PARAMETERS -----
+    // -----DEAFULT SYNTH PARAMETERS -----
     const params = {
         masterTune: 0, // In cents
         portamentoTime: 0, // Glide time in seconds
         vco1: { octave: 2, type: 'sawtooth' }, // Octave Index
         vco2: { octave: 2, type: 'sawtooth', detune: { value: 0 } }, // Detune in cents
-        vcfEnv: { attack: 0.01, decay: 0.1, sustain: 0.8, release: 0.2 },
-        vcaEnv: { attack: 0.01, decay: 0.1, sustain: 1.0, release: 0.2 },
+        vcfEnv: { attack: 0.01, decay: 0.01, sustain: 2, release: 0.01 },
+        vcaEnv: { attack: 0.01, decay: 0.01, sustain: 2, release: 0.01 },
         // LFO type will now control the switching gains, frequency controls both sources
         lfo: { frequency: { value: 5 }, type: 'sine' },
         vco1Gain: { gain: { value: 0.7 } },
