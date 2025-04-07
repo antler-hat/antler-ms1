@@ -1019,19 +1019,21 @@
         const labelElement = document.getElementById(labelId);
         if (!labelElement) return;
         if (sw.dataset.values) {
-            const values = sw.dataset.values.split(',');
-            // Adjusting label text based on state (reversed visually)
-            const text = state === 'up' ? values[1] : values[0]; // Map up state to right value, down state to left value
-            labelElement.textContent = text.substring(0, 2).toUpperCase();
+            const values = sw.dataset.values.split(','); // ["highpass", "lowpass"]
+            const text = state === 'up' ? values[0] : values[1]; // up='highpass', down='lowpass'
+            labelElement.textContent = text.substring(0, 2).toUpperCase(); // HI or LO
         } else {
-            labelElement.textContent = state === 'up' ? 'UP' : 'DOWN'; // Or keep simple UP/DOWN
+            labelElement.textContent = state === 'up' ? 'UP' : 'DOWN';
         }
         // Visual handle position update
-         if (state === 'up') {
-             handle.style.left = '2px'; // Handle on the left for 'up' state (first value visually)
-         } else { // state === 'down'
-             handle.style.left = `${sw.offsetWidth - handle.offsetWidth - 4}px`; // Handle on the right
-         }
+        if (state === 'up') {
+            // Set handle to the RIGHT for the 'up' state ('highpass', 'HI')
+            // Calculate the rightmost position dynamically
+            handle.style.left = `${sw.offsetWidth - handle.offsetWidth - 4}px`; // Adjust '4' based on padding/border if needed
+        } else { // state === 'down'
+            // Set handle to the LEFT for the 'down' state ('lowpass', 'LO')
+            handle.style.left = '2px'; // Adjust '2' based on padding/border if needed
+        }
     }
 
 
