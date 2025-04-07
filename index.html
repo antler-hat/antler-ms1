@@ -779,30 +779,78 @@
 
     // ----- ENVELOPE FUNCTIONS ----- (Unchanged - keep existing functions)
     function triggerEnvelope(envParams, targetParam, sustainValue, now, isVcf = false) {
-        if (!audioContext || !targetParam) return;
-        const { attack, decay } = envParams;
-        const safeAttack = Math.max(0.001, attack);
-        const safeDecay = Math.max(0.001, decay);
+        // Basic validation check
+        if (!audioContext || !targetParam || now === undefined || now <= 0) {
+            console.warn("triggerEnvelope skipped: Invalid context, target, or time.", {context: !!audioContext, target: !!targetParam, time: now});
+            return;
+        }
 
+        const { attack, decay } = envParams;
+        const safeAttack = Math.max(0.001, attack); // Ensure minimum attack time
+        const safeDecay = Math.max(0.001, decay);   // Ensure minimum decay time
+
+        // --- Cancel previous ramps FIRST ---
+        // It's crucial to cancel before getting the current value,
+        // as .value reflects the state *after* cancellation at time 'now'.
         targetParam.cancelScheduledValues(now);
 
         if (isVcf) {
+            // --- VCF Envelope Logic ---
             const knobBaseFreq = params.filter.frequency.value;
             const envModAmount = params.vcfEnvGain.gain.value;
             const baseFreqWithKeyFollow = Math.max(20, knobBaseFreq);
             const attackPeakFreq = baseFreqWithKeyFollow + envModAmount;
             const sustainLevelFreq = baseFreqWithKeyFollow + (sustainValue * envModAmount);
+
+            // Clamp values
             const nyquist = audioContext.sampleRate / 2;
             const clampedBaseFreq = Math.min(nyquist, Math.max(20, baseFreqWithKeyFollow));
-            const clampedPeakFreq = Math.min(nyquist, Math.max(20, attackPeakFreq));
+            const validAttackPeakFreq = (typeof attackPeakFreq === 'number' && isFinite(attackPeakFreq)) ? attackPeakFreq : clampedBaseFreq;
+            const clampedPeakFreq = Math.min(nyquist, Math.max(20, validAttackPeakFreq));
             const clampedSustainFreq = Math.min(nyquist, Math.max(20, sustainLevelFreq));
-            targetParam.setValueAtTime(clampedBaseFreq, now);
+
+            // --- OPTIONAL VCF START FROM CURRENT (Try if VCA fix isn't enough) ---
+             // const currentFreq = targetParam.value; // Read current value AFTER cancelScheduledValues
+             // const startFreq = (typeof currentFreq === 'number' && isFinite(currentFreq)) ? currentFreq : clampedBaseFreq;
+             // targetParam.setValueAtTime(startFreq, now); // Start VCF from current value (or fallback)
+            // --- If using above, comment out the line below ---
+            targetParam.setValueAtTime(clampedBaseFreq, now); // Standard: Start VCF at base freq
+
+            // Schedule ramps
             targetParam.linearRampToValueAtTime(clampedPeakFreq, now + safeAttack);
             targetParam.linearRampToValueAtTime(clampedSustainFreq, now + safeAttack + safeDecay);
-        } else {
+
+        } else { // --- VCA Envelope Logic ---
             const peakVal = 1.0;
-            const sustainLevel = Math.max(0.0001, sustainValue);
-            targetParam.setValueAtTime(0.0001, now);
+            const sustainLevel = Math.max(0.0001, sustainValue); // Ensure sustain is slightly above 0
+
+            // --- IMPLEMENTING 'Start from Current Gain' FIX ---
+            let startGain = 0.0001; // Default starting point if reading fails
+            try {
+                // Read the .value *after* cancelScheduledValues at time 'now'
+                const currentGain = targetParam.value;
+
+                // Check if currentGain is valid and use it as the starting point
+                if (typeof currentGain === 'number' && isFinite(currentGain) && currentGain >= 0) {
+                    // Use a minimum value slightly > 0 to prevent potential issues with log ramps if ever used
+                    startGain = Math.max(0.00001, currentGain);
+                    // console.log(`VCA Trigger: Starting from current gain: ${startGain.toFixed(5)}`);
+                } else {
+                    console.warn(`VCA Trigger: Invalid currentGain read (${currentGain}), using fallback ${startGain}`);
+                }
+                 // Set the starting value for the ramp
+                 targetParam.setValueAtTime(startGain, now);
+
+            } catch (err) {
+                 console.error("Error reading/setting VCA start gain:", err, "Using fallback.");
+                 // Attempt to set fallback value if try block failed
+                 try { targetParam.setValueAtTime(startGain, now); } catch(e) {
+                     console.error("FATAL: Failed even to set fallback VCA start gain.", e);
+                 }
+            }
+            // --- END 'Start from Current Gain' FIX ---
+
+            // Schedule the attack and decay ramps FROM the startGain value
             targetParam.linearRampToValueAtTime(peakVal, now + safeAttack);
             targetParam.linearRampToValueAtTime(sustainLevel, now + safeAttack + safeDecay);
         }

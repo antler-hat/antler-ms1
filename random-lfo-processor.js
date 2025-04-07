@@ -7,7 +7,7 @@ class RandomLfoProcessor extends AudioWorkletProcessor {
             name: 'frequency',
             defaultValue: 5,
             minValue: 0.1,
-            maxValue: 100,
+            maxValue: 30,
             automationRate: 'k-rate' // Can change per block, but not per sample
         }];
     }
