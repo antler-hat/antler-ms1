@@ -227,10 +227,10 @@
         </div>
         <div class="control-group">
             <label for="lfo-waveshape">
-                <span class="waveform-label" id="lfo-shape-indicator">⨅</span>
+                <span class="waveform-label" id="lfo-shape-indicator">∿</span>
             </label>
             <!-- ADD 'random' to data-steps -->
-            <div class="knob" id="lfo-waveshape" data-param="lfo.type" data-steps="square,sawtooth,triangle,sine,random" data-value="0" tabindex="0"></div>
+            <div class="knob" id="lfo-waveshape" data-param="lfo.type" data-steps="sine,triangle,square,sawtooth,random" data-value="0" tabindex="0"></div>
         </div>
     </div>
 
@@ -471,7 +471,7 @@
         vcfEnv: { attack: 0.01, decay: 0.1, sustain: 0.8, release: 0.2 },
         vcaEnv: { attack: 0.01, decay: 0.1, sustain: 1.0, release: 0.2 },
         // LFO type will now control the switching gains, frequency controls both sources
-        lfo: { frequency: { value: 5 }, type: 'square' },
+        lfo: { frequency: { value: 5 }, type: 'sine' },
         vco1Gain: { gain: { value: 0.7 } },
         vco2Gain: { gain: { value: 0.7 } },
         noiseGain: { gain: { value: 0 } },
@@ -504,7 +504,7 @@
     // Add 'random'
     const lfoWaveforms = ['square', 'sawtooth', 'triangle', 'sine', 'random'];
     // Add corresponding symbol (e.g., '?')
-    const lfoShapeIndicators = ['⨅', '⩘', '⋀', '∿', '?'];
+    const lfoShapeIndicators = [ '∿', '⋀', '⨅', '⩘', '﹖'];
     const FILTER_TYPES = ['highpass', 'lowpass']; // For VCF switch
 
     // ----- MONO SYNTH STATE -----
