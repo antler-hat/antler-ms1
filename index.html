@@ -615,7 +615,7 @@
             // --- Load the AudioWorklet module ---
             console.log("Loading Random LFO AudioWorklet module...");
             try {
-                await audioContext.audioWorklet.addModule('./random-lfo-processor.js');
+                await audioContext.audioWorklet.addModule('random-lfo-processor.js');
                 console.log("AudioWorklet module loaded successfully.");
             } catch (e) {
                  throw new Error(`Failed to load AudioWorklet module: ${e.message}`);
