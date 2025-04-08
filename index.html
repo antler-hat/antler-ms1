@@ -8,18 +8,26 @@
         @import url('https://fonts.googleapis.com/css2?family=Space+Mono&display=swap');
     </style>
     <style>
+        :root {
+            --space-base: 15px;
+            --space-sm: 10px;
+            --space-lg: 20px;
+            --grey-medium: #555555;
+            --grey-light: #cccccc;
+        }
+
         html {
             font-size: 10px;
         }
         body {
-            background-color: #000000;
-            color: #ffffff;
+            margin: 0;
+            background-color: black;
+            color: white;
             font-family: "Space Mono", sans-serif;
             display: flex;
             justify-content: center;
             align-items: flex-start; /* Align to top */
             min-height: 100vh;
-            padding-top: 20px; /* Add some padding at the top */
             user-select: none;
             -webkit-user-select: none;
             overflow-x: auto;
@@ -33,10 +41,15 @@
         h1 {
             font-size: 15px;
             margin-top: 0;
-            margin-bottom: 10px;
-            color: #ccc;
-            width: 100%;
-            padding-bottom: 5px;
+            margin-bottom: 0;
+            color: var(--grey-light);
+            display: inline-block;
+        }
+
+        .info-text {
+            color: var(--grey-medium);
+            text-transform: uppercase;
+            margin: 0;
         }
 
         .synth-panel {
@@ -47,11 +60,10 @@
             gap: 20px 20px;
              min-width: 800px; /* Minimum width for the panel */
              width: max-content; /* Adjust width based on content */
-             cursor: default;
         }
 
         .module {
-            padding: 15px 10px;
+            padding: var(--space-sm);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -62,9 +74,10 @@
         }
 
         .module-title {
+            padding: var(--space-base);
             font-size: 15px;
-            margin-bottom: 10px;
-            color: #ccc;
+            margin-bottom: var(--space-sm);
+            color: var(--grey-light);
             width: 100%;
             padding-bottom: 5px;
             text-align: center;
@@ -86,7 +99,7 @@
              flex-direction: row;
              align-items: baseline;
              justify-content: space-around;
-             gap: 10px;
+             gap: var(--space-sm);
              width: 100%;
          }
 
@@ -140,14 +153,14 @@
         }
 
         .knob:focus { /* Highlight when focused */
-            box-shadow: 0 0 0 2px #ffffff;
+            box-shadow: 0 0 0 2px white;
         }
 
         /* --- Value Display --- */
         .knob-value-display {
             color: rgba(255, 255, 255, 0.6);
             font-size: 0.8em;
-            background: #000000;
+            background: black;
             border-radius: 2.5px;
             min-width: 30px;
             text-align: center;
@@ -187,7 +200,7 @@
         .switch:before {
             content:'';
             height: 4px;
-            background: #000000;
+            background: black;
             display: inline-block;
             left: 0;
             right: 0;
@@ -219,11 +232,11 @@
         */
 
         .switch:focus {
-            box-shadow: 0 0 0 2px #ffffff;
+            box-shadow: 0 0 0 2px white;
          }
 
         /* --- Specific Module Layout (4 columns) --- */
-        #title-module { grid-column: 1 / span 4; grid-row: 3; }
+        #header { grid-column: 1 / span 4; grid-row: 3; }
         
         #lfo-module { grid-column: 1; grid-row: 1; }
         #mixer-module { grid-column: 1; grid-row: 2; }
@@ -236,6 +249,15 @@
 
         #system-module { grid-column: 4; grid-row: 1 / span 2; }
 
+        #header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+        }
+
+        .info-button {
+
+        }
 
         /* Adjust VCF/VCA layout */
         #vcf-module, #vca-module {
@@ -249,7 +271,7 @@
              display: grid;
              grid-template-columns: repeat(4, 1fr); /* 4 equal columns */
              width: 100%;
-             gap: 5px 10px; /* Row and column gap */
+             gap: 5px var(--space-sm); /* Row and column gap */
          }
 
          /* VCF Specific */
@@ -257,7 +279,7 @@
             display: flex; /* Use flexbox for horizontal alignment */
             justify-content: space-around; /* Space out controls */
             width: 100%;
-            gap: 10px; /* Add gap between filter controls */
+            gap: var(--space-sm); /* Add gap between filter controls */
             align-items: flex-start; /* Align groups to top */
         }
         #vcf-mod-controls {
@@ -273,7 +295,7 @@
              display: flex;
              justify-content: center; /* Center the single LFO Level knob */
              width: 100%;
-             margin-top: 10px; /* Add space above VCA Mod controls */
+             margin-top: var(--space-sm); /* Add space above VCA Mod controls */
              align-items: flex-start;
         }
 
@@ -292,8 +314,9 @@
 <body>
 
 <div class="synth-panel" id="synth-panel">
-    <div id="title-module">
+    <div id="header">
         <h1>DB-POL1</h1>
+        <p class="info-text">AWSEDFTGYHUJK | 1-0  | <- -> | + Shift</p>
     </div>
     <!-- LFO -->
     <div class="module" id="lfo-module">
