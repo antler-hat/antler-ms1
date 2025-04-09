@@ -1115,7 +1115,7 @@
                     // Update distortion curve (optional)
                     if (distortion) distortion.curve = makeDistortionCurve(valueToSet);
                      // Calculate and set Pre-Gain (Map knob 0-30 to gain 1 to X)
-                    const maxPreGain = 25; // Max gain boost factor
+                    const maxPreGain = 5; // Max gain boost factor
                     const preGainValue = 1 + (valueToSet / 30) * (maxPreGain - 1); // Linear map
                     if (distortionPreGain) {
                         distortionPreGain.gain.setTargetAtTime(preGainValue, now, defaultRampTime);
