@@ -658,7 +658,6 @@
     async function ensureAudioContextResumed() { if (!audioContext) { console.error("Context not initialized."); return false; } try { if (audioContext.state === 'running') { if (!isAudioResumed) { isAudioResumed = true; rampUpMasterGain(); } return true; } if (audioContext.state === 'suspended') { console.log("Context suspended. Resuming..."); await audioContext.resume(); if (audioContext.state === 'running') { console.log("Resumed."); isAudioResumed = true; rampUpMasterGain(); return true; } console.warn("Still not running after resume:", audioContext.state); isAudioResumed = false; return false; } if (audioContext.state === 'closed') { console.error("Context closed."); isAudioInitialized = false; isAudioResumed = false; return false; } console.warn("Unexpected state:", audioContext.state); isAudioResumed = false; return false; } catch (e) { console.error("Error resuming:", e); isAudioResumed = false; return false; } }
     function rampUpMasterGain() { if (!audioContext || !masterGain || audioContext.state !== 'running') return; const targetVolume = params.masterGain.gain.value; const currentVolume = masterGain.gain.value; if (Math.abs(currentVolume - targetVolume) < 0.01) return; const rampTime = 0.05; console.log(`Ramping master gain to ${targetVolume} over ${rampTime}s`); masterGain.gain.setValueAtTime(currentVolume, audioContext.currentTime); masterGain.gain.linearRampToValueAtTime(targetVolume, audioContext.currentTime + rampTime); }
 
-    // --- MODIFIED initAudio ---
     async function initAudio() {
         if (isAudioInitialized) return;
         console.log("Initializing AudioContext...");
@@ -670,16 +669,19 @@
 
             console.log("Loading Random LFO AudioWorklet module...");
             try {
+                // IMPORTANT: Ensure 'random-lfo-processor.js' exists at the correct path relative to your HTML file
                 await audioContext.audioWorklet.addModule('random-lfo-processor.js');
                 console.log("AudioWorklet module loaded successfully.");
             } catch (e) {
-                 console.error("Failed to load AudioWorklet module 'random-lfo-processor.js'.", e);
+                 console.error("Failed to load AudioWorklet module 'random-lfo-processor.js'. Make sure the file exists and the path is correct.", e);
+                 // Optionally provide a fallback or stop initialization
+                 // For now, we'll throw to make the issue clear.
                  throw new Error(`Failed to load AudioWorklet module: ${e.message}`);
             }
             isAudioInitialized = true;
             console.log("Initial AudioContext State:", audioContext.state);
 
-            // --- Create Core Synth Nodes ---
+            // --- Create Core Synth Nodes (As before) ---
             masterGain = audioContext.createGain(); params.masterGain.node = masterGain;
             masterGain.gain.value = 0; // Start muted
 
@@ -689,115 +691,165 @@
             vco2Gain = audioContext.createGain(); params.vco2Gain.node = vco2Gain;
             noiseGain = audioContext.createGain(); params.noiseGain.node = noiseGain;
             filter = audioContext.createBiquadFilter(); params.filter.node = filter;
-            filter.frequency.value = params.filter.frequency.value;
+            filter.frequency.value = params.filter.frequency.value; // Initialize
             vcaEnvelopeGain = audioContext.createGain(); vcaEnvelopeGain.gain.value = 0;
-            vcaLfoModGain = audioContext.createGain(); vcaLfoModGain.gain.value = 0;
-            lfoVcaBaseGain = audioContext.createConstantSource(); lfoVcaBaseGain.offset.value = 1.0;
+            vcaLfoModGain = audioContext.createGain(); vcaLfoModGain.gain.value = 0; // Modulated by VCA LFO
+            lfoVcaBaseGain = audioContext.createConstantSource(); lfoVcaBaseGain.offset.value = 1.0; // Base for VCA LFO mod
+
             lfo = audioContext.createOscillator(); params.lfo.node = lfo;
             vco1LfoGain = audioContext.createGain(); params.vco1LfoGain.node = vco1LfoGain;
             vco2LfoGain = audioContext.createGain(); params.vco2LfoGain.node = vco2LfoGain;
             vcfLfoGain = audioContext.createGain(); params.vcfLfoGain.node = vcfLfoGain;
             vcaLfoGain = audioContext.createGain(); params.vcaLfoGain.node = vcaLfoGain;
             vcfEnvGain = audioContext.createGain(); params.vcfEnvGain.node = vcfEnvGain;
-            lfoOscGain = audioContext.createGain();
+
+            lfoOscGain = audioContext.createGain(); // For switching LFO waveform sources
             lfoRandomGain = audioContext.createGain();
             lfoRandomNode = new AudioWorkletNode(audioContext, 'random-lfo-processor');
             lfoRandomFrequencyParam = lfoRandomNode.parameters.get('frequency');
             if (!lfoRandomFrequencyParam) console.warn("Could not get 'frequency' parameter from random LFO worklet.");
 
-            // --- Create Noise Source ---
+            // --- Create Noise Source (As before) ---
              const bufferSize = audioContext.sampleRate * 2;
              const noiseBuffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
              const output = noiseBuffer.getChannelData(0);
              for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
              noiseSource = audioContext.createBufferSource();
              noiseSource.buffer = noiseBuffer; noiseSource.loop = true;
-             params.noiseSource = { node: noiseSource };
+             params.noiseSource = { node: noiseSource }; // Store if needed
 
-            // --- Create FX Nodes ---
-            effectsInput = audioContext.createGain(); // Point where main synth output feeds FX
-            distortion = audioContext.createWaveShaper(); //params.distortion = { node: distortion }; // Store if needed
-            delay = audioContext.createDelay(2.0); params.delayTime.node = delay;
-            delayFeedbackGain = audioContext.createGain(); params.delayFeedbackGain.node = delayFeedbackGain;
-            delayWetGain = audioContext.createGain(); // params.delayWetGain.node = delayWetGain; // Store if needed
-            reverb = audioContext.createConvolver(); // params.reverb = { node: reverb }; // Store if needed
-            reverbWetGain = audioContext.createGain(); // params.reverbWetGain.node = reverbWetGain; // Store if needed
-            reverbLPF = audioContext.createBiquadFilter(); // <<< CREATE REVERB FILTER
+            // --- Create FX Nodes (NEW and existing) ---
+            effectsInput = audioContext.createGain();       // Explicit entry point for FX
+            preDistMix = audioContext.createGain();         // Mixes Dry + Wet FX before distortion
+            fxReturnMix = audioContext.createGain();        // Collects wet delay & reverb
 
-            // --- Create Reverb Impulse (Mono, preferred method) ---
-             const reverbTime = 1.5, decay = 2.0, sampleRate = audioContext.sampleRate;
+            distortion = audioContext.createWaveShaper();   // Distortion effect
+
+            delay = audioContext.createDelay(2.0);          // Max delay time 2s
+            params.delayTime.node = delay;                  // Store node if needed by param system
+            delayFeedbackGain = audioContext.createGain();
+            params.delayFeedbackGain.node = delayFeedbackGain; // Store node if needed
+            delayWetGain = audioContext.createGain();       // Controlled by delayLevel
+
+            reverb = audioContext.createConvolver();        // Reverb effect
+            reverbWetGain = audioContext.createGain();      // Controlled by reverbLevel
+            reverbLPF = audioContext.createBiquadFilter();  // Filter for reverb output
+
+            // --- Create Reverb Impulse (Mono - As before) ---
+             const reverbTime = 2, reverbDecay = 4.0, sampleRate = audioContext.sampleRate;
              const length = sampleRate * reverbTime;
-             const impulse = audioContext.createBuffer(1, length, sampleRate); // MONO impulse
-             const impulseL = impulse.getChannelData(0);
+             const impulse = audioContext.createBuffer(1, length, sampleRate); // MONO
+             const impulseData = impulse.getChannelData(0);
              for (let i = 0; i < length; i++) {
-                  const envelope = Math.pow(1 - i / length, decay);
-                  impulseL[i] = (Math.random() * 2 - 1) * envelope;
+                  const envelope = Math.pow(1 - i / length, reverbDecay);
+                  impulseData[i] = (Math.random() * 2 - 1) * envelope;
              }
              reverb.buffer = impulse;
              // --- End Reverb Impulse ---
 
              // --- Configure Reverb Filter ---
              reverbLPF.type = 'lowpass';
-             reverbLPF.frequency.value = 2000; // Set desired cutoff
-             reverbLPF.Q.value = 1; // Default Q
+             reverbLPF.frequency.value = 1300; // Adjust as desired
+             reverbLPF.Q.value = 1;
              // --- End Reverb Filter Config ---
 
-            // --- Connect Audio Graph ---
+            // --- Connect Audio Graph (SYNTH PART - Mostly As Before) ---
              // LFO Path Switching & Destinations
              lfo.connect(lfoOscGain); lfoRandomNode.connect(lfoRandomGain);
              lfoOscGain.connect(vco1LfoGain); lfoRandomGain.connect(vco1LfoGain); vco1LfoGain.connect(vco1.detune);
              lfoOscGain.connect(vco2LfoGain); lfoRandomGain.connect(vco2LfoGain); vco2LfoGain.connect(vco2.detune);
              lfoOscGain.connect(vcfLfoGain); lfoRandomGain.connect(vcfLfoGain); vcfLfoGain.connect(filter.frequency);
-             lfoOscGain.connect(vcaLfoGain); lfoRandomGain.connect(vcaLfoGain); vcaLfoGain.connect(vcaLfoModGain.gain);
+             lfoOscGain.connect(vcaLfoGain); lfoRandomGain.connect(vcaLfoGain); vcaLfoGain.connect(vcaLfoModGain.gain); // Modulates VCA LFO amount
+
              // VCF Envelope
              vcfEnvGain.connect(filter.frequency);
+
              // Oscillators & Noise -> Mixer -> Filter
              vco1.connect(vco1Gain); vco2.connect(vco2Gain); noiseSource.connect(noiseGain);
              vco1Gain.connect(filter); vco2Gain.connect(filter); noiseGain.connect(filter);
-            // Filter -> VCA Envelope -> VCA LFO Mod -> Effects Input (BEFORE FX)
+
+            // Filter -> VCA Envelope -> VCA LFO Mod -> EFFECTS INPUT (Connects synth output to FX chain)
              filter.connect(vcaEnvelopeGain);
              vcaEnvelopeGain.connect(vcaLfoModGain);
-             lfoVcaBaseGain.connect(vcaLfoModGain.gain); // LFO base gain for VCA Mod
-             vcaLfoModGain.connect(effectsInput); // Main synth signal now goes into effects chain
+             lfoVcaBaseGain.connect(vcaLfoModGain.gain); // Constant source providing base gain for LFO modulation subtraction/addition
+             vcaLfoModGain.connect(effectsInput); // <<< POINT WHERE SYNTH OUTPUT ENTERS FX CHAIN
 
-             // FX Chain
-             effectsInput.connect(distortion);     // Signal first goes to distortion
-             distortion.connect(masterGain);       // Distorted signal goes to master (acts as 'dry' for delay/reverb sends)
+             // --- Connect Audio Graph (FX PART - NEW ROUTING) ---
 
-             // Send from Distortion to Delay
-             distortion.connect(delay);
+             // 1. Dry Path: FX Input -> Pre-Distortion Mix
+             effectsInput.connect(preDistMix);
+
+             // 2. Send to Delay: FX Input -> Delay Input
+             effectsInput.connect(delay);
+
+             // 3. Delay Chain: Feedback Loop
              delay.connect(delayFeedbackGain);
-             delayFeedbackGain.connect(delay);     // Feedback loop
+             delayFeedbackGain.connect(delay);
+
+             // 4. Wet Delay Path:
+             //    a) Delay Output -> Delay Wet Gain (controlled by knob)
              delay.connect(delayWetGain);
-             delayWetGain.connect(masterGain);     // Delay Wet signal mixes into master
+             //    b) Wet Delay -> FX Return Mix (to be mixed with dry)
+             delayWetGain.connect(fxReturnMix);
+             //    c) Wet Delay -> Reverb Input (Delay repeats feed reverb)
+             delayWetGain.connect(reverb); // <<< DELAY FEEDS REVERB
 
-             // Send from Distortion to Reverb (which then goes through LPF)
-             distortion.connect(reverb);
+             // 5. Send to Reverb (Direct): FX Input -> Reverb Input
+             effectsInput.connect(reverb); // <<< MAIN SIGNAL FEEDS REVERB
+
+             // 6. Reverb Chain:
+             //    a) Reverb Output -> Reverb Wet Gain (controlled by knob)
              reverb.connect(reverbWetGain);
-             reverbWetGain.connect(reverbLPF);     // <<< Reverb Wet -> LPF
-             reverbLPF.connect(masterGain);        // <<< LPF -> Master
+             //    b) Wet Reverb -> LPF
+             reverbWetGain.connect(reverbLPF);
+             //    c) Filtered Reverb -> FX Return Mix
+             reverbLPF.connect(fxReturnMix);
 
-             // Final Output
+             // 7. Combine Dry + Wet FX:
+             //    a) FX Return (Wet Delay + Wet Reverb) -> Pre-Distortion Mix
+             fxReturnMix.connect(preDistMix);
+
+             // 8. Distortion Stage:
+             //    a) Combined Signal -> Distortion Curve
+             preDistMix.connect(distortion);
+
+             // 9. Master Output:
+             //    a) Distortion -> Master Gain (Volume)
+             distortion.connect(masterGain);
+             //    b) Master Gain -> Destination
              masterGain.connect(audioContext.destination);
 
-            // --- Start Persistent Oscillators ---
-            lfo.start(); lfoVcaBaseGain.start(); vco1.start(); vco2.start(); noiseSource.start();
+             // --- End Audio Graph Connections ---
+
+            // --- Start Persistent Oscillators & Sources ---
+            lfo.start();
+            lfoVcaBaseGain.start();
+            vco1.start();
+            vco2.start();
+            noiseSource.start();
+            lfoRandomNode.connect(audioContext.destination); // Need to connect worklet to trigger processing
+            lfoRandomNode.disconnect(audioContext.destination); // Disconnect immediately, connection just starts it.
 
             // --- Initialize UI and Set Initial Audio Node Values ---
-            updateAllKnobs(true); // Will set initial FX levels via updateParameter
+            updateAllKnobs(true); // This will set initial FX levels via updateParameter
             updateAllSwitches(true);
 
             // --- Final State Check & Master Gain Ramp ---
-            if (audioContext.state === 'running') { isAudioResumed = true; rampUpMasterGain(); }
-            else { isAudioResumed = false; console.log("Audio graph initialized, context suspended."); }
+            if (audioContext.state === 'running') {
+                isAudioResumed = true;
+                rampUpMasterGain(); // Use existing ramp function
+            }
+            else {
+                isAudioResumed = false;
+                console.log("Audio graph initialized, context suspended.");
+            }
 
         } catch (e) {
              console.error("Error initializing Web Audio API or Worklet:", e);
              isAudioInitialized = false; isAudioResumed = false;
-             alert("Web Audio API/Worklet initialization failed: " + e.message);
+             alert("Web Audio API/Worklet initialization failed: " + e.message + "\n\nPlease check console for details (e.g., missing 'random-lfo-processor.js').");
         }
     }
-    // --- END MODIFIED initAudio ---
 
     // ----- ENVELOPE FUNCTIONS -----
     // (triggerEnvelope, releaseEnvelope, triggerEnvelopes, releaseEnvelopes - unchanged)
@@ -817,7 +869,6 @@
     function updateKnobVisual(knob, valueForRotation, actualAudioValue) { knob.dataset.actualValue = typeof actualAudioValue === 'number' ? actualAudioValue.toFixed(5) : String(actualAudioValue); const steps = knob.dataset.steps ? knob.dataset.steps.split(',') : null; let percentage = Math.max(0, Math.min(1, valueForRotation)); if (steps) { const numSteps = steps.length; const stepIndex = numSteps > 1 ? Math.round(percentage * (numSteps - 1)) : 0; if (knob.id === 'lfo-waveshape') document.getElementById('lfo-shape-indicator').textContent = lfoShapeIndicators[stepIndex] || '?'; else if (knob.id === 'vco1-waveshape') document.getElementById('vco1-shape-indicator').textContent = vcoShapeIndicators[stepIndex] || '?'; else if (knob.id === 'vco2-waveshape') document.getElementById('vco2-shape-indicator').textContent = vcoShapeIndicators[stepIndex] || '?'; else if (knob.id === 'vco1-octave') document.getElementById('vco1-octave-indicator').textContent = octaveSteps[stepIndex] ? octaveSteps[stepIndex] + "'" : '?'; else if (knob.id === 'vco2-octave') document.getElementById('vco2-octave-indicator').textContent = octaveSteps[stepIndex] ? octaveSteps[stepIndex] + "'" : '?'; } else { updateKnobValueDisplay(knob, actualAudioValue); } const rotation = -135 + (percentage * 270); knob.style.transform = `rotate(${rotation}deg)`; }
     function updateSwitchVisual(sw) { const state = sw.dataset.state; const handle = sw.querySelector('.switch-handle'); const labelId = sw.id + '-label'; const labelElement = document.getElementById(labelId); if (!labelElement) return; if (sw.dataset.values) { const values = sw.dataset.values.split(','); const text = state === 'up' ? values[0] : values[1]; labelElement.textContent = text.substring(0, 2).toUpperCase(); } else { labelElement.textContent = state === 'up' ? 'UP' : 'DOWN'; } if (state === 'up') { handle.style.left = `${sw.offsetWidth - handle.offsetWidth - 4}px`; } else { handle.style.left = '2px'; } }
 
-    // --- MODIFIED updateParameter ---
     function updateParameter(knobOrSwitch, newValue, forceUpdate = false) {
         const element = knobOrSwitch;
         const paramPath = element.dataset.param;
@@ -826,7 +877,7 @@
 
         let actualAudioValue; // Value sent to Web Audio node
 
-        // --- Calculate actualAudioValue based on UI input ---
+        // --- Calculate actualAudioValue based on UI input (Mostly as before) ---
         if (isKnob) {
             const min = parseFloat(element.dataset.min);
             const max = parseFloat(element.dataset.max);
@@ -838,18 +889,21 @@
             if (steps) {
                 const stepIndex = Math.max(0, Math.min(steps.length - 1, Math.round(numericNewValue)));
                 const stepValueStr = steps[stepIndex];
+                // Determine if step value is a string (waveform, filter type) or number
                 if (lfoWaveforms.includes(stepValueStr) || vcoWaveforms.includes(stepValueStr) || FILTER_TYPES.includes(stepValueStr)) {
                     actualAudioValue = stepValueStr;
                 } else {
+                    // Assume numeric step, or use the index if it's an octave
                     actualAudioValue = isNaN(parseFloat(stepValueStr)) ? stepValueStr : parseFloat(stepValueStr);
                 }
-                if (paramPath.endsWith('.octave')) actualAudioValue = stepIndex; // Use index for octave
-                element.dataset.value = stepIndex; // Store index in dataset
+                if (paramPath.endsWith('.octave')) actualAudioValue = stepIndex; // Use index for octave param
+                element.dataset.value = stepIndex; // Store index in dataset for stepped knobs
                 percentageForVisual = steps.length > 1 ? stepIndex / (steps.length - 1) : 0.5;
             } else { // Continuous knobs
                 let clampedValue = Math.max(min, Math.min(max, numericNewValue));
                 actualAudioValue = clampedValue;
                 element.dataset.value = clampedValue.toFixed(5); // Store precise value in dataset
+                // Calculate percentage for visual rotation
                 if (isLog) {
                     if (clampedValue <= min) percentageForVisual = 0;
                     else if (clampedValue >= max) percentageForVisual = 1;
@@ -858,27 +912,28 @@
                     const range = max - min;
                     percentageForVisual = range > 0 ? (clampedValue - min) / range : 0.5;
                 }
-                 percentageForVisual = Math.max(0, Math.min(1, percentageForVisual));
+                 percentageForVisual = Math.max(0, Math.min(1, isNaN(percentageForVisual) ? 0.5 : percentageForVisual));
             }
             updateKnobVisual(element, percentageForVisual, actualAudioValue);
 
         } else if (isSwitch) {
-            const state = newValue;
+            const state = newValue; // 'up' or 'down'
             element.dataset.state = state;
             if (element.dataset.values) {
-                const values = element.dataset.values.split(',');
+                const values = element.dataset.values.split(','); // e.g., "highpass,lowpass"
                 actualAudioValue = state === 'up' ? values[0] : values[1];
             } else {
+                // Default switch behavior (e.g., 1 for 'up', 0 for 'down')
                 actualAudioValue = state === 'up' ? 1 : 0;
             }
             updateSwitchVisual(element);
-            element.dataset.value = actualAudioValue;
+            element.dataset.value = actualAudioValue; // Store the actual audio value
         } else {
             console.warn("updateParameter called on non-control element:", element);
             return;
         }
 
-        // --- Update Internal Params Object ---
+        // --- Update Internal Params Object (As before) ---
         const parts = paramPath.split('.');
         let currentParamObj = params;
         try {
@@ -888,29 +943,30 @@
             }
             const finalKey = parts[parts.length - 1];
 
-             // Handle nested param objects like gain.value or detune.value
+            // Handle nested param objects like gain.value or frequency.value
             if (typeof currentParamObj[finalKey] === 'object' && currentParamObj[finalKey] !== null && 'value' in currentParamObj[finalKey]) {
                  currentParamObj[finalKey].value = actualAudioValue;
             } else {
-                // Direct assignment for flat params or non-nested structures
+                // Direct assignment for flat params (like delayLevel, reverbLevel, distortionAmount)
+                // or simple types (like filter.type, vco.type)
                 currentParamObj[finalKey] = actualAudioValue;
             }
         } catch (e) { console.error("Error updating internal params:", paramPath, e); }
 
-        // --- Update Web Audio Node ---
+        // --- Update Web Audio Node (Revised FX logic) ---
         if (isAudioInitialized && (isAudioResumed || forceUpdate) && audioContext) {
             const now = audioContext.currentTime;
-            const fastRampTime = 0.005;
-            const defaultRampTime = 0.010;
+            const fastRampTime = 0.005; // Quick ramp for freq, etc.
+            const defaultRampTime = 0.010; // Standard ramp for gain, etc.
             const valueToSet = actualAudioValue; // Use the calculated value
 
             try {
-                // --- LFO ---
+                // --- LFO (As before) ---
                 if (paramPath === 'lfo.frequency.value' && typeof valueToSet === 'number') {
                     if (lfo) lfo.frequency.setTargetAtTime(valueToSet, now, defaultRampTime);
                     if (lfoRandomFrequencyParam) lfoRandomFrequencyParam.setTargetAtTime(valueToSet, now, defaultRampTime);
                 } else if (paramPath === 'lfo.type' && typeof valueToSet === 'string') {
-                    if (valueToSet === 'random') {
+                     if (valueToSet === 'random') {
                         if(lfoOscGain) lfoOscGain.gain.setTargetAtTime(0, now, fastRampTime);
                         if(lfoRandomGain) lfoRandomGain.gain.setTargetAtTime(1, now, fastRampTime);
                     } else {
@@ -919,40 +975,51 @@
                         if(lfoRandomGain) lfoRandomGain.gain.setTargetAtTime(0, now, fastRampTime);
                     }
                 }
-                // --- Master Gain ---
+                // --- Master Gain (As before) ---
                 else if (paramPath === 'masterGain.gain.value' && masterGain) {
                     if (audioContext.state === 'running') masterGain.gain.setTargetAtTime(valueToSet, now, defaultRampTime);
-                    else masterGain.gain.value = valueToSet;
+                    else masterGain.gain.value = valueToSet; // Set directly if suspended
                 }
-                // --- Mixer ---
+                // --- Mixer Gains (As before) ---
                 else if (paramPath === 'vco1Gain.gain.value' && vco1Gain) vco1Gain.gain.setTargetAtTime(valueToSet, now, defaultRampTime);
                 else if (paramPath === 'vco2Gain.gain.value' && vco2Gain) vco2Gain.gain.setTargetAtTime(valueToSet, now, defaultRampTime);
                 else if (paramPath === 'noiseGain.gain.value' && noiseGain) noiseGain.gain.setTargetAtTime(valueToSet, now, defaultRampTime);
-                // --- LFO Mod Depths ---
+                // --- LFO Mod Depths (As before) ---
                 else if (paramPath === 'vco1LfoGain.gain.value' && vco1LfoGain) vco1LfoGain.gain.setTargetAtTime(valueToSet, now, defaultRampTime);
                 else if (paramPath === 'vco2LfoGain.gain.value' && vco2LfoGain) vco2LfoGain.gain.setTargetAtTime(valueToSet, now, defaultRampTime);
                 else if (paramPath === 'vcfLfoGain.gain.value' && vcfLfoGain) vcfLfoGain.gain.setTargetAtTime(valueToSet, now, defaultRampTime);
                 else if (paramPath === 'vcaLfoGain.gain.value' && vcaLfoGain) vcaLfoGain.gain.setTargetAtTime(valueToSet, now, defaultRampTime);
-                // --- VCF Env Depth ---
+                // --- VCF Env Depth (As before) ---
                 else if (paramPath === 'vcfEnvGain.gain.value' && vcfEnvGain) vcfEnvGain.gain.setTargetAtTime(valueToSet, now, defaultRampTime);
-                // --- Main VCF ---
+                // --- Main VCF (As before) ---
                 else if (paramPath === 'filter.frequency.value' && filter) filter.frequency.setTargetAtTime(valueToSet, now, fastRampTime);
                 else if (paramPath === 'filter.Q.value' && filter) filter.Q.setTargetAtTime(valueToSet, now, defaultRampTime);
                 else if (paramPath === 'filter.type' && filter && typeof valueToSet === 'string') filter.type = valueToSet;
-                // --- VCO Types ---
-                else if (paramPath === 'vco1.type' && vco1 && typeof valueToSet === 'string') vco1.type = valueToSet;
-                else if (paramPath === 'vco2.type' && vco2 && typeof valueToSet === 'string') vco2.type = valueToSet;
-                // --- FX ---
-                else if (paramPath === 'distortionAmount' && distortion) distortion.curve = makeDistortionCurve(valueToSet);
-                else if (paramPath === 'delayTime.delayTime.value' && delay) delay.delayTime.setTargetAtTime(valueToSet, now, defaultRampTime);
-                else if (paramPath === 'delayFeedbackGain.gain.value' && delayFeedbackGain) delayFeedbackGain.gain.setTargetAtTime(valueToSet, now, defaultRampTime);
-                else if (paramPath === 'delayLevel' && delayWetGain) {
-                    delayWetGain.gain.setTargetAtTime(valueToSet, now, defaultRampTime);
-                } else if (paramPath === 'reverbLevel' && reverbWetGain) {
-                    const boostedReverbGain = valueToSet * 4; // Apply boost factor
-                    reverbWetGain.gain.setTargetAtTime(boostedReverbGain, now, defaultRampTime);
+                // --- VCO Types (As before) ---
+                 else if (paramPath === 'vco1.type' && vco1 && typeof valueToSet === 'string') vco1.type = valueToSet;
+                 else if (paramPath === 'vco2.type' && vco2 && typeof valueToSet === 'string') vco2.type = valueToSet;
+
+                // --- FX (REVISED Logic) ---
+                else if (paramPath === 'distortionAmount' && distortion && typeof valueToSet === 'number') {
+                    distortion.curve = makeDistortionCurve(valueToSet); // Update distortion curve
                 }
-                // --- Tuning/Octave/Detune (only update if note is playing) ---
+                else if (paramPath === 'delayTime.delayTime.value' && delay && typeof valueToSet === 'number') {
+                    delay.delayTime.setTargetAtTime(valueToSet, now, defaultRampTime);
+                }
+                else if (paramPath === 'delayFeedbackGain.gain.value' && delayFeedbackGain && typeof valueToSet === 'number') {
+                    delayFeedbackGain.gain.setTargetAtTime(valueToSet, now, defaultRampTime);
+                }
+                else if (paramPath === 'delayLevel' && delayWetGain && typeof valueToSet === 'number') {
+                    // Delay Level knob directly controls the delayWetGain node
+                    delayWetGain.gain.setTargetAtTime(valueToSet, now, defaultRampTime);
+                }
+                 else if (paramPath === 'reverbLevel' && reverbWetGain && typeof valueToSet === 'number') {
+                    // Reverb Level knob directly controls the reverbWetGain node
+                    // NO BOOST FACTOR APPLIED HERE - it's handled by the routing.
+                    reverbWetGain.gain.setTargetAtTime(valueToSet, now, defaultRampTime);
+                }
+
+                // --- Tuning/Octave/Detune (As before - only update active notes) ---
                  else if (currentNote !== null && (paramPath === 'vco1.octave' || paramPath === 'vco2.octave')) {
                      const targetOsc1Freq = calculateVcoFrequency(currentFrequency, params.vco1);
                      const targetOsc2Freq = calculateVcoFrequency(currentFrequency, params.vco2);
@@ -964,12 +1031,11 @@
                      if (vco1) vco1.detune.setTargetAtTime(totalDetune1, now, fastRampTime);
                      if (vco2) vco2.detune.setTargetAtTime(totalDetune2, now, fastRampTime);
                  }
-                 // ADSR/Portamento params are handled internally, no direct audio node update needed here
+                 // ADSR/Portamento params are stored internally and used by envelope/note functions
 
             } catch (e) { console.error(`Error setting AudioNode param ${paramPath}:`, e, "Value:", valueToSet); }
         }
     }
-    // --- END MODIFIED updateParameter ---
 
     // (updateAllKnobs, updateAllSwitches - unchanged)
     function updateAllKnobs(forceUpdate = false) { if (!knobs) knobs = synthPanel.querySelectorAll('.knob'); knobs.forEach(knob => { let initialValueStr = knob.getAttribute('data-value'); let valueToPass; const steps = knob.dataset.steps ? knob.dataset.steps.split(',') : null; let currentDatasetValue = knob.dataset.value; if (forceUpdate && initialValueStr !== null) { valueToPass = steps ? parseInt(initialValueStr) : parseFloat(initialValueStr); if(currentDatasetValue === undefined || currentDatasetValue === null) knob.dataset.value = initialValueStr; } else { currentDatasetValue = currentDatasetValue || initialValueStr || '0'; valueToPass = steps ? parseInt(currentDatasetValue) : parseFloat(currentDatasetValue); } updateParameter(knob, valueToPass, forceUpdate); if (!steps) { const displayId = knob.id + '-value'; const displayElement = document.getElementById(displayId); if (displayElement) displayElement.style.display = 'none'; } }); }
