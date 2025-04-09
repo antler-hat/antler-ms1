@@ -12,6 +12,7 @@
             --space-base: 15px;
             --space-sm: 10px;
             --space-lg: 20px;
+            --grey-dark: #333333;
             --grey-medium: #666666;
             --grey-light: #cccccc;
             --button-bg: black;
@@ -49,8 +50,6 @@
             display: inline-block;
         }
 
-        .info-text {
-            color: var(--grey-medium);
         .synth-panel {
             padding: 20px;
             display: grid;
@@ -219,6 +218,7 @@
              border-radius: 3px;
              overflow: hidden;
              outline: none; /* Remove default focus outline */
+             border: 1px solid  var(--grey-dark); /* Add subtle border */
              background-color: #282828; /* Match knob bg */
         }
 
@@ -233,7 +233,6 @@
             position: absolute;
             border-bottom: 1px solid #333333
         }
-
 
         .switch-handle {
             position: absolute;
@@ -260,6 +259,10 @@
             box-shadow: 0 0 0 2px white;
          }
 
+         /* --- MODAL STYLES --- */
+        .modal-scrim {
+            position: fixed;
+            top: 0;
             left: 0;
             width: 100%;
             height: 100%;
