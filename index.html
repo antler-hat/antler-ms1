@@ -540,7 +540,7 @@
         <div class="control-group-horizontal">
              <div class="control-group">
                 <label for="distortion-amount">Drive</label>
-                <div class="knob" id="distortion-amount" data-param="distortionAmount" data-min="0" data-max="30" data-value="0" tabindex="0"></div>
+                <div class="knob" id="distortion-amount" data-param="distortionAmount" data-min="0" data-max="100" data-value="0" tabindex="0"></div>
                 <span class="knob-value-display" id="distortion-amount-value"></span>
             </div>
         </div>
@@ -648,7 +648,29 @@
     // (midiToFreq, calculateVcoFrequency, makeDistortionCurve, formatKnobValue, updateKnobValueDisplay - unchanged)
     function midiToFreq(midiNote) { return 440 * Math.pow(2, (midiNote - MIDI_C4) / 12); }
     function calculateVcoFrequency(baseFreq, vcoParams) { let octaveIndex = vcoParams.octave; if (typeof octaveIndex !== 'number' || isNaN(octaveIndex) || octaveIndex < 0 || octaveIndex >= octaveMultipliers.length) { console.warn(`Invalid octaveIndex (${octaveIndex}), defaulting to 2`); octaveIndex = 2; } const freq = baseFreq * octaveMultipliers[octaveIndex]; const safeFreq = Math.max(20, Math.min((audioContext?.sampleRate || 44100) / 2, freq)); if (!isFinite(safeFreq)) { console.error("FATAL: Calculated VCO frequency non-finite!", freq, baseFreq, octaveIndex); return 440; } return safeFreq; }
-    function makeDistortionCurve(amount) { if (!audioContext) return null; const k = typeof amount === 'number' ? amount : 0; const n_samples = 44100; const curve = new Float32Array(n_samples); const deg = Math.PI / 180; let x; for (let i = 0; i < n_samples; ++i) { x = i * 2 / n_samples - 1; curve[i] = (Math.PI/2) * Math.tanh(x * (k / 50 + 1)); } return curve; }
+    function makeDistortionCurve(amount) {
+    if (!audioContext) return null;
+    const k = typeof amount === 'number' ? Math.max(0, amount) : 0; // Ensure k is non-negative
+    const n_samples = 44100;
+    const curve = new Float32Array(n_samples);
+
+    // --- INCREASED STEEPNESS ---
+    // Original divisor was 50 in the tanh calculation: (k / 50 + 1)
+    // Try a smaller divisor. Lower value = more intense faster.
+    const divisor = 10; // <<< TUNE THIS VALUE (e.g., 10, 15, 20)
+    const steepness = 1 + (k / divisor);
+    // ---
+
+    let x;
+    for (let i = 0; i < n_samples; ++i) {
+        x = i * 2 / n_samples - 1; // Input signal sample (-1 to 1)
+
+        // Original curve had (Math.PI/2) * Math.tanh(...)
+        // Using just Math.tanh allows output to reach +/- 1 more easily potentially adding intensity
+        curve[i] = Math.tanh(x * steepness);
+    }
+    return curve;
+}
     function formatKnobValue(value, knobId) { if (typeof value !== 'number' || !isFinite(value)) { return '---'; } if (knobId && knobId.includes('cutoff')) { return value >= 1000 ? (value / 1000).toFixed(1) + 'k' : value.toFixed(0); } else if (knobId && (knobId.includes('attack') || knobId.includes('decay') || knobId.includes('release') || knobId.includes('time'))) { return value < 1 ? (value * 1000).toFixed(0) + 'ms' : value.toFixed(2) + 's'; } else if (knobId && (knobId.includes('tune') || knobId.includes('detune') || knobId.includes('lfo-level'))) { return value.toFixed(1); } else if (knobId && knobId.includes('res')) { return value.toFixed(1); } else { return value.toFixed(2); } }
     function updateKnobValueDisplay(knob, value) { if (knob && !knob.dataset.steps) { const displayId = knob.id + '-value'; const displayElement = document.getElementById(displayId); if (displayElement) { displayElement.textContent = formatKnobValue(value, knob.id); } } }
 
@@ -1000,8 +1022,17 @@
                  else if (paramPath === 'vco2.type' && vco2 && typeof valueToSet === 'string') vco2.type = valueToSet;
 
                 // --- FX (REVISED Logic) ---
-                else if (paramPath === 'distortionAmount' && distortion && typeof valueToSet === 'number') {
-                    distortion.curve = makeDistortionCurve(valueToSet); // Update distortion curve
+                else if (paramPath === 'distortionAmount' && typeof valueToSet === 'number') {
+                    // Update distortion curve (optional, you could simplify this if pre-gain is enough)
+                    if (distortion) distortion.curve = makeDistortionCurve(valueToSet);
+
+                    // Calculate and set Pre-Gain
+                    // Map knob value (0-30) to gain (e.g., 1 to 10). Adjust '10' for max gain.
+                    const maxPreGain = 50; // <<< TUNE THIS VALUE for maximum intensity boost
+                    const preGainValue = 1 + (valueToSet / 30) * (maxPreGain - 1);
+                    if (distortionPreGain) {
+                        distortionPreGain.gain.setTargetAtTime(preGainValue, now, defaultRampTime);
+                    }
                 }
                 else if (paramPath === 'delayTime.delayTime.value' && delay && typeof valueToSet === 'number') {
                     delay.delayTime.setTargetAtTime(valueToSet, now, defaultRampTime);
